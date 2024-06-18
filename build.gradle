@@ -1,0 +1,50 @@
+
+plugins {
+    id 'java'
+}
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'application'
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven {
+        url "https://repo.akka.io/maven"
+    }
+}
+def versions = [
+        ScalaBinary: "2.13",
+        AkkaVersion: "2.9.0",
+        LogBackVersion: "1.2.3",
+        JunitVersion: "4.13.1"
+]
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    implementation "com.typesafe.akka:akka-bom_${versions.ScalaBinary}:${versions.AkkaVersion}"
+    implementation "com.typesafe.akka:akka-actor-typed_${versions.ScalaBinary}:${versions.AkkaVersion}"
+
+    testImplementation "com.typesafe.akka:akka-actor-testkit-typed_${versions.ScalaBinary}:${versions.AkkaVersion}"
+    testImplementation "junit:junit:${versions.JunitVersion}"
+    implementation "ch.qos.logback:logback-classic:${versions.LogBackVersion}"
+
+}
+compileJava {
+    options.compilerArgs += ["-Xlint:deprecation"]
+}
+
+mainClassName = "org.example.Main"
+
+
+
+test {
+    useJUnitPlatform()
+}
+run {
+    standardInput = System.in
+}
