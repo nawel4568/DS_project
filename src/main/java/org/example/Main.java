@@ -12,7 +12,7 @@ import java.io.IOException;
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
-    final static int N_REPLICAS = 2;
+    final static int N_REPLICAS = 4;
     public static void main(String[] args) {
         final ActorSystem system = ActorSystem.create("DistributedSystem");
 
