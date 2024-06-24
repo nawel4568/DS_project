@@ -5,17 +5,11 @@ import akka.actor.Props;
 
 public class Client extends AbstractActor {
     private final int clientId;
-    private int v;
 
 
     public Client(int clientId) {
         this.clientId = clientId;
     }
-
-    public void setValue(int v) {
-        this.v = v;
-    }
-    public int getValue() { return v; }
 
     @Override
     public Receive createReceive() {
@@ -23,7 +17,11 @@ public class Client extends AbstractActor {
                 .match(Integer.class, this::OnReceiveValue).build();
     }
 
-    private void OnReceiveValue(Integer val){ this.v = val; }
+    public int getClientId(){
+        return clientId;
+    }
+
+    private void OnReceiveValue(Integer val){ System.out.println(getSelf().path().name()+" read done "+val);}
 
     public static Props props(int clientId) {
         return Props.create(Client.class, () -> new Client(clientId));

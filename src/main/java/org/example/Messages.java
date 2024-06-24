@@ -3,15 +3,20 @@ package org.example;
 import akka.actor.ActorRef;
 
 import java.io.Serializable;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class Messages implements Serializable {
-    public final ActorRef client;
+    public final ActorRef sender;
 
-    public Messages(ActorRef client){
-        this.client = client;
+    public Messages(ActorRef sender){
+        this.sender = sender;
+    }
+
+    public static class StartMessage implements Serializable{
+        public final List<ActorRef> group;
+        public StartMessage(List<ActorRef> group) {
+            this.group = Collections.unmodifiableList(new ArrayList<>(group));
+        }
     }
 
     public static class ReadReqMsg extends Messages {
@@ -21,8 +26,14 @@ public class Messages implements Serializable {
     }
 
     public static class WriteReqMsg extends Messages {
-        public WriteReqMsg(ActorRef client) {
+        private int v;
+        public WriteReqMsg(ActorRef client, int v) {
             super(client);
+            this.v = v;
+        }
+
+        public int getV() {
+            return v;
         }
     }
 

@@ -4,7 +4,7 @@ import java.util.Objects;
 
 public class TimeId {
     public final int epoch;
-    public final int seqNum;
+    public int seqNum;
 
     public TimeId(int aEpoch, int aSeqNum){
         this.epoch = aEpoch;
