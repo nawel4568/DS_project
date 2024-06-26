@@ -38,20 +38,18 @@ public class Messages implements Serializable {
     }
 
     public static class UpdateMsg extends Messages {
-        public final int newVal;
-        public final TimeId uid;
-        public UpdateMsg(ActorRef client, int aNewVal, TimeId aid) {
+        public final Snapshot HistoryNode;
+        public UpdateMsg(ActorRef client, Snapshot HistoryNode) {
             super(client);
-            this.newVal = aNewVal;
-            this.uid = aid;
+            this.HistoryNode = HistoryNode;
         }
     }
 
     public static class WriteAckMsg extends Messages {
         public final TimeId uid;
-        public WriteAckMsg(ActorRef client, TimeId aid) {
+        public WriteAckMsg(ActorRef client, TimeId uid) {
             super(client);
-            this.uid = aid;
+            this.uid = uid;
         }
     }
 
@@ -64,10 +62,10 @@ public class Messages implements Serializable {
     }
 
     public static class WriteOKMsg extends Messages {
-        public final int newVal;
-        public WriteOKMsg(ActorRef client, int aNewVal) {
+        public final TimeId uid;
+        public WriteOKMsg(ActorRef client, TimeId aid) {
             super(client);
-            this.newVal = aNewVal;
+            this.uid = aid;
         }
     }
 
@@ -84,16 +82,16 @@ public class Messages implements Serializable {
     }
 
     public static class ElectionMsg extends Messages {
-        public final Map<ActorRef, History> knownHistories;
-        public ElectionMsg(ActorRef client, HashMap<ActorRef, History> prevHists) {
+        public final Map<ActorRef, LinkedList<Snapshot>> knownHistories;
+        public ElectionMsg(ActorRef client, HashMap<ActorRef, LinkedList<Snapshot>> prevHists) {
             super(client);
-            this.knownHistories = Collections.unmodifiableMap(new HashMap<ActorRef, History>(prevHists));
+            this.knownHistories = Collections.unmodifiableMap(new HashMap<ActorRef, LinkedList<Snapshot>>(prevHists));
         }
     }
 
     public static class SyncMsg extends Messages {
-        public final History sync;
-        public SyncMsg(ActorRef client, History syncHistory) {
+        public final LinkedList<Snapshot> sync;
+        public SyncMsg(ActorRef client, LinkedList<Snapshot> syncHistory) {
             super(client);
             this.sync = syncHistory;
         }
