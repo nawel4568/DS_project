@@ -5,6 +5,7 @@ import akka.util.DoubleLinkedList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 
 public class Snapshot {
     private final TimeId timeId;
@@ -16,5 +17,10 @@ public class Snapshot {
     public TimeId getTimeId() {
         return timeId;
     }
+    public int getV(){ return v; }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(timeId, v);
+    }
 }

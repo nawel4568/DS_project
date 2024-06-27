@@ -2,7 +2,7 @@ package org.example;
 
 import java.util.Objects;
 
-public class TimeId {
+public class TimeId implements Comparable<TimeId> {
     public final int epoch;
     public int seqNum;
 
@@ -17,6 +17,15 @@ public class TimeId {
         if (obj == null || this.getClass() != obj.getClass()) return false;
         TimeId timeObj = (TimeId) obj;
         return this.epoch == timeObj.epoch && this.seqNum == timeObj.seqNum;
+    }
+
+    @Override
+    public int compareTo(TimeId other) {
+        if (this.epoch != other.epoch) {
+            return Integer.compare(this.epoch, other.epoch);
+        } else {
+            return Integer.compare(this.seqNum, other.seqNum);
+        }
     }
 
     @Override

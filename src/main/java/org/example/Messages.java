@@ -20,15 +20,15 @@ public class Messages implements Serializable {
     }
 
     public static class ReadReqMsg extends Messages {
-        public ReadReqMsg(ActorRef client) {
-            super(client);
+        public ReadReqMsg(ActorRef sender) {
+            super(sender);
         }
     }
 
     public static class WriteReqMsg extends Messages {
         private int v;
-        public WriteReqMsg(ActorRef client, int v) {
-            super(client);
+        public WriteReqMsg(ActorRef sender, int v) {
+            super(sender);
             this.v = v;
         }
 
@@ -38,61 +38,71 @@ public class Messages implements Serializable {
     }
 
     public static class UpdateMsg extends Messages {
-        public final Snapshot HistoryNode;
-        public UpdateMsg(ActorRef client, Snapshot HistoryNode) {
-            super(client);
-            this.HistoryNode = HistoryNode;
+        public final Snapshot snap;
+        public UpdateMsg(ActorRef sender, Snapshot asnap) {
+            super(sender);
+            this.snap = asnap;
         }
     }
 
     public static class WriteAckMsg extends Messages {
         public final TimeId uid;
-        public WriteAckMsg(ActorRef client, TimeId uid) {
-            super(client);
+        public WriteAckMsg(ActorRef sender, TimeId uid) {
+            super(sender);
             this.uid = uid;
-        }
-    }
-
-    public static class ElectionAckMsg extends Messages {
-        public final TimeId uid;
-        public ElectionAckMsg(ActorRef client, TimeId aid) {
-            super(client);
-            this.uid = aid;
         }
     }
 
     public static class WriteOKMsg extends Messages {
         public final TimeId uid;
-        public WriteOKMsg(ActorRef client, TimeId aid) {
-            super(client);
+        public WriteOKMsg(ActorRef sender, TimeId aid) {
+            super(sender);
             this.uid = aid;
         }
     }
 
     public static class CrashMsg extends Messages {
-        public CrashMsg(ActorRef client) {
-            super(client);
+        public CrashMsg(ActorRef sender) {
+            super(sender);
         }
     }
 
     public static class HeartbeatMsg extends Messages {
-        public HeartbeatMsg(ActorRef client) {
-            super(client);
+        public HeartbeatMsg(ActorRef sender) {
+            super(sender);
         }
     }
 
     public static class ElectionMsg extends Messages {
-        public final Map<ActorRef, LinkedList<Snapshot>> knownHistories;
-        public ElectionMsg(ActorRef client, HashMap<ActorRef, LinkedList<Snapshot>> prevHists) {
-            super(client);
-            this.knownHistories = Collections.unmodifiableMap(new HashMap<ActorRef, LinkedList<Snapshot>>(prevHists));
+        public static final class ActorData{
+            public final ActorRef replicaRef;
+            public final int actorId;
+            public final Snapshot lastUpdate;
+
+            public ActorData(ActorRef replicaRef, int actorId, Snapshot lastUpdate) {
+                this.replicaRef = replicaRef;
+                this.actorId = actorId;
+                this.lastUpdate = lastUpdate;
+            }
+        }
+        public final List<ActorData> actorDatas;
+        public ElectionMsg(ActorRef sender, List<ActorData> actorUpdates) {
+            super(sender);
+            this.actorDatas = Collections.unmodifiableList(new ArrayList<ActorData>(actorUpdates));
         }
     }
 
+    public static class ElectionAckMsg extends Messages {
+        public ElectionAckMsg(ActorRef sender) {
+            super(sender);
+        }
+    }
+
+
     public static class SyncMsg extends Messages {
-        public final LinkedList<Snapshot> sync;
-        public SyncMsg(ActorRef client, LinkedList<Snapshot> syncHistory) {
-            super(client);
+        public final List<Snapshot> sync;
+        public SyncMsg(ActorRef sender, List<Snapshot> syncHistory) {
+            super(sender);
             this.sync = syncHistory;
         }
     }

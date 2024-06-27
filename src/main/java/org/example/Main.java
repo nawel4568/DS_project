@@ -17,9 +17,9 @@ public class Main {
         final ActorSystem system = ActorSystem.create("DistributedSystem");
 
         List<ActorRef> group = new ArrayList<ActorRef>();
-        for (int i=0; i<N_REPLICAS; i++) {
+        for (int i=0; i<N_REPLICAS; i++)
             group.add(system.actorOf(Replica.props(i), "Replica" + i));
-        }
+
 
         Messages.StartMessage start = new Messages.StartMessage(group);
         for (ActorRef peer: group) {
