@@ -4,6 +4,7 @@ import akka.actor.AbstractActor;
 import akka.actor.Props;
 
 public class Client extends AbstractActor {
+    private final static int TIMEOUT = 100;
     private final int clientId;
 
 

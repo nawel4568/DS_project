@@ -45,9 +45,9 @@ public class Messages implements Serializable {
         }
     }
 
-    public static class WriteAckMsg extends Messages {
+    public static class UpdateAckMsg extends Messages {
         public final TimeId uid;
-        public WriteAckMsg(ActorRef sender, TimeId uid) {
+        public UpdateAckMsg(ActorRef sender, TimeId uid) {
             super(sender);
             this.uid = uid;
         }
@@ -107,7 +107,13 @@ public class Messages implements Serializable {
         }
     }
 
-
+    public static class TimeoutMsg extends Messages{
+        public final Replica.TimeoutType type;
+        public TimeoutMsg(ActorRef sender, Replica.TimeoutType type){
+            super(sender);
+            this.type = type;
+        }
+    }
 
 
 

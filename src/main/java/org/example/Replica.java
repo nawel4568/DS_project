@@ -2,16 +2,25 @@ package org.example;
 
 import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
+import akka.actor.Cancellable;
 import akka.actor.Props;
+import scala.concurrent.duration.Duration;
 
-import java.io.Serializable;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 
 public class Replica extends AbstractActor {
+    //private final static int HEARTBEAT_TIMEOUT = 50;
+    //private final static int UPDATEREQ_TIMEOUT = 20;
+    //private final static int WRITEOK_TIMEOUT = 20;
+    //private final static int ELECTION_ACK_TIMEOUT = 10;
+    //private final static int ELECTION_PROTOCOL_TIMEOUT = 1000;
+    private HashMap<TimeoutType, Cancellable> timeoutSchedule;
+
     private final int replicaId;
     private ActorRef successor;
-    private final TimeId timeStamp;
+    private TimeId timeStamp;
     private List<ActorRef> groupOfReplicas;
     private ActorRef coordinator;
     private final LinkedList<Snapshot> localHistory; // this is the linked list of the local history: last node is the last update. For each update, we have the timestamp associated (with the Snapshot datatype)
@@ -20,6 +29,23 @@ public class Replica extends AbstractActor {
                                                     // the quorum request for message m0 is reached)
     private final Queue<Messages.WriteReqMsg> writeReqMsgQueue; // this is the queue of the write requests for when a replica receives write reqs from the clients during the lection: we have to enqueue the
                                                                 //requests and serve them later
+    private boolean isInElectionBehavior;
+
+    public enum TimeoutType{
+        UPDATE_REQ(20),
+        WRITEOK(20),
+        ELECTION_ACK(10),
+        ELECTION_PROTOCOL(1000),
+        HEARTBEAT(100);
+
+        private final int millis;
+        TimeoutType(int millis){
+            this.millis=millis;
+        }
+
+        public int getMillis(){ return this.millis; }
+    }
+
 
     public static Props props(int replicaId) {
         return Props.create(Replica.class, () -> new Replica(replicaId));
@@ -32,6 +58,19 @@ public class Replica extends AbstractActor {
         this.writeAckHistory = new HashMap<TimeId, Snapshot>();
         this.quorum = new HashMap<TimeId, Integer>();
         this.writeReqMsgQueue = new LinkedList<Messages.WriteReqMsg>();
+        this.isInElectionBehavior = false;
+        this.timeoutSchedule = new HashMap<TimeoutType, Cancellable>();
+    }
+
+    private void setTimeout(TimeoutType type){
+        Cancellable newTimeout = getContext().system().scheduler().scheduleOnce(
+                Duration.create(type.getMillis(), TimeUnit.MILLISECONDS),
+                getSelf(),
+                new Messages.TimeoutMsg(this.getSelf(), type),
+                getContext().system().dispatcher(),
+                getSelf()
+        );
+        timeoutSchedule.put(type, newTimeout);
     }
 
 
@@ -68,7 +107,7 @@ public class Replica extends AbstractActor {
         return receiveBuilder()
                 .match(Messages.ReadReqMsg.class, this::onReadReqMsg)
                 .match(Messages.WriteReqMsg.class, this::onWriteReqMsg)
-                .match(Messages.WriteAckMsg.class, this::onWriteAckMsg)
+                .match(Messages.UpdateAckMsg.class, this::onUpdateAckMsg)
                 .build();
     }
 
@@ -95,6 +134,7 @@ public class Replica extends AbstractActor {
 
     public void onStartMessage(Messages.StartMessage msg) {
         setGroup(msg);
+        setTimeout(TimeoutType.HEARTBEAT);
     }
 
     public void crash(int interval) {
@@ -112,7 +152,7 @@ public class Replica extends AbstractActor {
         // Handle WriteReqMsg
         if(getSelf().equals(coordinator)){
             // if the replica is the coordinator
-            timeStamp.seqNum++;
+            timeStamp = new TimeId(timeStamp.epoch, timeStamp.seqNum+1);
             Snapshot snap = new Snapshot(timeStamp, req.getV());
             this.writeAckHistory.put(timeStamp, snap);
 
@@ -135,7 +175,7 @@ public class Replica extends AbstractActor {
     public void onUpdateMsg(Messages.UpdateMsg msg) {
         // Handle UpdateMsg
         writeAckHistory.put(msg.snap.getTimeId(), msg.snap);
-        coordinator.tell(new Messages.WriteAckMsg(msg.sender, msg.snap.getTimeId()), ActorRef.noSender());
+        coordinator.tell(new Messages.UpdateAckMsg(msg.sender, msg.snap.getTimeId()), ActorRef.noSender());
     }
 
     public void onWriteOKMsg(Messages.WriteOKMsg msg) {
@@ -145,6 +185,11 @@ public class Replica extends AbstractActor {
 
     public void onElectionMsg(Messages.ElectionMsg msg) {
         // Handle ElectionMsg
+        if (!isInElectionBehavior) {
+            this.getContext().become(replicaDuringElectionBehavior());
+            isInElectionBehavior = true;
+
+        }
 
         List<Messages.ElectionMsg.ActorData> actorData = msg.actorDatas;
         List<Integer> actorIDs = new ArrayList<Integer>();
@@ -157,8 +202,8 @@ public class Replica extends AbstractActor {
             for(Messages.ElectionMsg.ActorData actorDatum : actorData) { //check if you are the most updated one and if you are the highest-ID one among the most updated
                 comp = actorDatum.lastUpdate.getTimeId().compareTo(localHistory.getLast().getTimeId());
                 if (comp > 0 || ( comp == 0 && actorDatum.actorId > this.replicaId )) { //if not, then forward and return
-                    this.getSender().tell(new Messages.ElectionAckMsg(this.getSelf()), this.getSelf());
                     this.successor.tell(msg, this.getSelf());
+                    this.getSender().tell(new Messages.ElectionAckMsg(this.getSelf()), this.getSelf());
                     return;
                 }
             }
@@ -171,11 +216,19 @@ public class Replica extends AbstractActor {
                     Snapshot snap = it.next();
                     if(snap.equals(actorDatum.lastUpdate)) //this is the last update of the actor, everything from now on has to be sent to him
                         break;
-                    partialHistory.add(snap);
+                    partialHistory.addFirst(snap);
                 }
-                Messages.SyncMsg sync = new Messages.SyncMsg(this.getSelf(), partialHistory);
                 this.getSender().tell(new Messages.ElectionAckMsg(this.getSelf()), this.getSelf());
+
+                this.isInElectionBehavior = false;
+                this.getContext().unbecome();
+                this.getContext().become(coordinatorBehavior());
+                this.setCoordinator(this.getSelf());
+                Messages.SyncMsg sync = new Messages.SyncMsg(this.getSelf(), partialHistory);
                 actorDatum.replicaRef.tell(sync, this.getSelf());
+                this.ventWriteQueue(); //empty the write requests queue
+                this.timeStamp = new TimeId(this.timeStamp.epoch+1, 0);
+                return;
             }
         }
         else { //put yourself in the message and forward
@@ -191,18 +244,24 @@ public class Replica extends AbstractActor {
 
     public void onHeartbeatMsg(Messages.HeartbeatMsg msg) {
         // Handle HeartbeatMsg
+        Cancellable heartbeatTimeout = this.timeoutSchedule.get(TimeoutType.HEARTBEAT);
+        heartbeatTimeout.cancel();
+        this.setTimeout(TimeoutType.HEARTBEAT);
     }
 
     public void onSyncMsg(Messages.SyncMsg msg) {
         // Handle SyncMsg
-        this.coordinator = this.getSender();
+        this.isInElectionBehavior = false;
+        this.getContext().unbecome();
+        this.setCoordinator(this.getSender());
         this.localHistory.addAll(msg.sync);
-        while(!writeReqMsgQueue.isEmpty()){ //send all the wirte requests enqueued during the election phase
-            this.coordinator.tell(writeReqMsgQueue.remove(), this.getSelf());
+        this.ventWriteQueue();
+        if(!this.writeAckHistory.isEmpty()){
+
         }
     }
 
-    public void onWriteAckMsg(Messages.WriteAckMsg msg){ // **** work in this to stay alive and timeout while it doesn't receive the ACK cuz this is called each tile it receives an ACK
+    public void onUpdateAckMsg(Messages.UpdateAckMsg msg){ // **** work in this to stay alive and timeout while it doesn't receive the ACK cuz this is called each tile it receives an ACK
         quorum.putIfAbsent(msg.uid, 1);
         quorum.put(msg.uid, quorum.get(msg.uid) + 1);
         if(quorum.get(msg.uid) == (groupOfReplicas.size()/2+1)){
@@ -214,6 +273,12 @@ public class Replica extends AbstractActor {
             }
             quorum.remove(msg.uid);
         }
+
+    }
+
+    private void ventWriteQueue(){
+        while(!writeReqMsgQueue.isEmpty()) //send all the wirte requests enqueued during the election phase
+            this.coordinator.tell(writeReqMsgQueue.remove(), this.getSelf());
 
     }
 

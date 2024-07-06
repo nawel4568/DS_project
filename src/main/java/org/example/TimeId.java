@@ -4,7 +4,7 @@ import java.util.Objects;
 
 public class TimeId implements Comparable<TimeId> {
     public final int epoch;
-    public int seqNum;
+    public final int seqNum;
 
     public TimeId(int aEpoch, int aSeqNum){
         this.epoch = aEpoch;
