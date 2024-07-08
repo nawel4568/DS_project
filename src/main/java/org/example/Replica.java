@@ -23,8 +23,9 @@ public class Replica extends AbstractActor {
     private TimeId timeStamp;
     private List<ActorRef> groupOfReplicas;
     private ActorRef coordinator;
-    private final LinkedList<Snapshot> localHistory; // this is the linked list of the local history: last node is the last update. For each update, we have the timestamp associated (with the Snapshot datatype)
-    private final HashMap<TimeId, Snapshot> writeAckHistory; // this is the history for saving the values with their timeStamp during the update phase.
+    private final List<Snapshot> localHistory; // this is the linked list of the local history: last node is the last update. For each update, we have the timestamp associated (with the Snapshot datatype)
+
+    // private final HashMap<TimeId, Snapshot> writeAckHistory; // this is the history for saving the values with their timeStamp during the update phase.
     private final HashMap<TimeId, Integer> quorum; //this is the quorum hashmap, because we assume that it can be possible that two quorums are asked concurrently (quorum for message m1 can start before
                                                     // the quorum request for message m0 is reached)
     private final Queue<Messages.WriteReqMsg> writeReqMsgQueue; // this is the queue of the write requests for when a replica receives write reqs from the clients during the lection: we have to enqueue the
@@ -54,8 +55,8 @@ public class Replica extends AbstractActor {
     public Replica(int replicaId) {
         this.replicaId = replicaId;
         this.timeStamp = new TimeId(0,0);
-        this.localHistory = new LinkedList<Snapshot>();
-        this.writeAckHistory = new HashMap<TimeId, Snapshot>();
+        this.localHistory = new ArrayList<Snapshot>();
+        //this.writeAckHistory = new HashMap<TimeId, Snapshot>();
         this.quorum = new HashMap<TimeId, Integer>();
         this.writeReqMsgQueue = new LinkedList<Messages.WriteReqMsg>();
         this.isInElectionBehavior = false;
@@ -145,7 +146,7 @@ public class Replica extends AbstractActor {
     public void onReadReqMsg(Messages.ReadReqMsg req) {
         // Handle ReadReqMsg
         System.out.println(getSender().path().name()+" read req to "+getSelf().path().name()); // getSender().path().name : returns the name of the sender actor
-        req.sender.tell(localHistory.getLast().getV(), getSelf());
+        req.sender.tell(localHistory.get(localHistory.size()-1).getV(), getSelf());
     }
 
     public void onWriteReqMsg(Messages.WriteReqMsg req) {
@@ -153,11 +154,11 @@ public class Replica extends AbstractActor {
         if(getSelf().equals(coordinator)){
             // if the replica is the coordinator
             timeStamp = new TimeId(timeStamp.epoch, timeStamp.seqNum+1);
-            Snapshot snap = new Snapshot(timeStamp, req.getV());
-            this.writeAckHistory.put(timeStamp, snap);
+            Snapshot snap = new Snapshot(timeStamp, req.getV(),false);
+            this.localHistory.add(snap); // add the Msg to the local history of the coordinator with a specification that it's unstable
 
-            Messages.UpdateMsg updateMsg = new Messages.UpdateMsg(req.sender, snap);
-            for (ActorRef replica: groupOfReplicas){
+            Messages.UpdateMsg updateMsg = new Messages.UpdateMsg(req.sender, snap); // create the update message with our Snapshot
+            for (ActorRef replica: groupOfReplicas){ // Broadcast the Update message to all the Replicas
                 replica.tell(updateMsg, ActorRef.noSender());
             }
         }else{ // if the Replica is not the coordinator
@@ -174,16 +175,16 @@ public class Replica extends AbstractActor {
 
     public void onUpdateMsg(Messages.UpdateMsg msg) {
         // Handle UpdateMsg
-        writeAckHistory.put(msg.snap.getTimeId(), msg.snap);
-        coordinator.tell(new Messages.UpdateAckMsg(msg.sender, msg.snap.getTimeId()), ActorRef.noSender());
+        localHistory.add(msg.snap); // add the unstable message to the replicas localHistory
+        coordinator.tell(new Messages.UpdateAckMsg(msg.sender, msg.snap.getTimeId()), ActorRef.noSender()); //send the Ack of this specific message with associating the timeId of the message
     }
 
     public void onWriteOKMsg(Messages.WriteOKMsg msg) {
         // Handle WriteOKMsg
-        localHistory.add(writeAckHistory.remove(msg.uid));
+        localHistory.get(msg.uid.seqNum-1).setStable(true);
     }
 
-    public void onElectionMsg(Messages.ElectionMsg msg) {
+    /** public void onElectionMsg(Messages.ElectionMsg msg) {
         // Handle ElectionMsg
         if (!isInElectionBehavior) {
             this.getContext().become(replicaDuringElectionBehavior());
@@ -240,7 +241,9 @@ public class Replica extends AbstractActor {
         }
 
 
-    }
+    } **/
+
+    void onElectionMsg(Messages.ElectionMsg msg) {}
 
     public void onHeartbeatMsg(Messages.HeartbeatMsg msg) {
         // Handle HeartbeatMsg
@@ -261,18 +264,24 @@ public class Replica extends AbstractActor {
         }
     }
 
-    public void onUpdateAckMsg(Messages.UpdateAckMsg msg){ // **** work in this to stay alive and timeout while it doesn't receive the ACK cuz this is called each tile it receives an ACK
-        quorum.putIfAbsent(msg.uid, 1);
-        quorum.put(msg.uid, quorum.get(msg.uid) + 1);
-        if(quorum.get(msg.uid) == (groupOfReplicas.size()/2+1)){
-            localHistory.add(writeAckHistory.remove(msg.uid));
-            Messages.WriteOKMsg writeOk= new Messages.WriteOKMsg(msg.sender, msg.uid);
-
-            for (ActorRef replica: groupOfReplicas){
-                replica.tell(writeOk, getSelf());
+    public void onUpdateAckMsg(Messages.UpdateAckMsg msg){// **** work in this to stay alive and timeout while it doesn't receive the ACK cuz this is called each tile it receives an ACK
+        if(!localHistory.get(msg.uid.seqNum-1).getStable()){
+            if(!quorum.containsKey(msg.uid)){
+                quorum.put(msg.uid, 2); // the quorum == 2 because the coordinator ACK + the replicas ACK
+            }else{
+                quorum.put(msg.uid, quorum.get(msg.uid) + 1);
+                if(quorum.get(msg.uid) >= (groupOfReplicas.size()/2+1)){
+                    localHistory.get(msg.uid.seqNum-1).setStable(true);
+                    Messages.WriteOKMsg writeOk= new Messages.WriteOKMsg(msg.sender, msg.uid);
+                    for (ActorRef replica: groupOfReplicas){
+                        replica.tell(writeOk, getSelf());
+                    }
+                    quorum.remove(msg.uid);
+                }
             }
-            quorum.remove(msg.uid);
         }
+
+
 
     }
 

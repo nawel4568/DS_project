@@ -74,7 +74,7 @@ public class Messages implements Serializable {
     }
 
     public static class ElectionMsg extends Messages {
-        public static final class ActorData{
+        /*public static final class ActorData{
             public final ActorRef replicaRef;
             public final int actorId;
             public final Snapshot lastUpdate;
@@ -89,7 +89,9 @@ public class Messages implements Serializable {
         public ElectionMsg(ActorRef sender, List<ActorData> actorUpdates) {
             super(sender);
             this.actorDatas = Collections.unmodifiableList(new ArrayList<ActorData>(actorUpdates));
-        }
+        }*/
+
+
     }
 
     public static class ElectionAckMsg extends Messages {
