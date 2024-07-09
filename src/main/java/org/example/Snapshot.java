@@ -20,16 +20,26 @@ public class Snapshot {
         return timeId;
     }
     public int getV(){ return v; }
-    public boolean isStable() { return stable; }
     public void setStable(boolean isStable) {
         this.stable=isStable;
     }
-    public boolean getStable(){
-        return stable;
-    }
+    public boolean getStable(){ return stable; }
 
     @Override
     public int hashCode() {
         return Objects.hash(timeId, v);
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        Snapshot other = (Snapshot) obj;
+        return v == other.v && stable == other.stable && Objects.equals(timeId, other.timeId);
+    }
+
 }
