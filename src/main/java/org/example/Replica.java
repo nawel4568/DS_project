@@ -59,7 +59,6 @@ public class Replica extends AbstractActor {
         this.localHistory = new ArrayList<Snapshot>();
         //this.writeAckHistory = new HashMap<TimeId, Snapshot>();
         this.quorum = new HashMap<TimeId, Integer>();
-        this.writeReqMsgQueue = new LinkedList<Messages.WriteReqMsg>();
         this.isInElectionBehavior = false;
         this.timeoutSchedule = new HashMap<TimeoutType, Cancellable>();
     }
@@ -148,7 +147,7 @@ public class Replica extends AbstractActor {
         // Handle ReadReqMsg
         System.out.println(getSender().path().name()+" read req to "+getSelf().path().name()); // getSender().path().name : returns the name of the sender actor
         this.getSender().tell(localHistory.get(localHistory.size()-1).getV(), getSelf());
-    }match(Messages.WriteReqMsg.class, writeReqMsg -> {})
+    }
 
     public void onWriteReqMsg(Messages.WriteReqMsg req) {
         // Handle WriteReqMsg
@@ -188,63 +187,6 @@ public class Replica extends AbstractActor {
         this.localHistory.get((this.localHistory.size()-1) - seqNumDiff).setStable(true); //set stable the message
     }
 
-    /** public void onElectionMsg(Messages.ElectionMsg msg) {
-        // Handle ElectionMsg
-        if (!isInElectionBehavior) {
-            this.getContext().become(replicaDuringElectionBehavior());
-            isInElectionBehavior = true;
-        }
-
-        List<Messages.ElectionMsg.ActorData> actorData = msg.actorDatas;
-        List<Integer> actorIDs = new ArrayList<Integer>();
-
-        for(Messages.ElectionMsg.ActorData actorDatum : actorData)
-            actorIDs.add(actorDatum.actorId);
-
-        if(actorIDs.contains(this.replicaId)){ //if the message contains already this Actor
-            int comp;
-            for(Messages.ElectionMsg.ActorData actorDatum : actorData) { //check if you are the most updated one and if you are the highest-ID one among the most updated
-                comp = actorDatum.lastUpdate.getTimeId().compareTo(localHistory.getLast().getTimeId());
-                if (comp > 0 || ( comp == 0 && actorDatum.actorId > this.replicaId )) { //if not, then forward and return
-                    this.successor.tell(msg, this.getSelf());
-                    this.getSender().tell(new Messages.ElectionAckMsg(this.getSelf()), this.getSelf());
-                    return;
-                }
-            }
-
-            //Otherwise congrats, you are the new coordinator
-            for(Messages.ElectionMsg.ActorData actorDatum : actorData){// tell this to everyone and update all the other nodes
-                Iterator<Snapshot> it = this.localHistory.descendingIterator();
-                LinkedList<Snapshot> partialHistory = new LinkedList<Snapshot>(); //this will be the missing history of this Actor
-                while(it.hasNext()){
-                    Snapshot snap = it.next();
-                    if(snap.equals(actorDatum.lastUpdate)) //this is the last update of the actor, everything from now on has to be sent to him
-                        break;
-                    partialHistory.addFirst(snap);
-                }
-                this.getSender().tell(new Messages.ElectionAckMsg(this.getSelf()), this.getSelf());
-
-                this.isInElectionBehavior = false;
-                this.getContext().unbecome();
-                this.getContext().become(coordinatorBehavior());
-                this.setCoordinator(this.getSelf());
-                Messages.SyncMsg sync = new Messages.SyncMsg(this.getSelf(), partialHistory);
-                actorDatum.replicaRef.tell(sync, this.getSelf());
-                this.ventWriteQueue(); //empty the write requests queue
-                this.timeStamp = new TimeId(this.timeStamp.epoch+1, 0);
-                return;
-            }
-        }
-        else { //put yourself in the message and forward
-            Messages.ElectionMsg.ActorData data = new Messages.ElectionMsg.ActorData(this.getSelf(), this.replicaId, localHistory.getLast());
-            List<Messages.ElectionMsg.ActorData> newActorData = new ArrayList<Messages.ElectionMsg.ActorData>(actorData);
-            newActorData.add(data);
-     this.successor.tell(new Messages.ElectionMsg(this.getSelf(), newActorData), this.getSelf());
-     this.getSender().tell(new Messages.ElectionAckMsg(this.getSelf()), this.getSelf());
-        }
-
-
-    } **/
 
     public void onElectionMsg(Messages.ElectionMsg msg) {
         if (!isInElectionBehavior) {
@@ -282,8 +224,6 @@ public class Replica extends AbstractActor {
             newActorData.add(newData);
             this.successor.tell(new Messages.ElectionMsg(this.timeStamp.epoch, newActorData), this.getSelf());
             this.getSender().tell(new Messages.ElectionAckMsg(), this.getSelf());
-
-
         }
     }
 
@@ -291,34 +231,17 @@ public class Replica extends AbstractActor {
         //tell that you are the new coordinator and send the missing partial history to each node
         for(Messages.ElectionMsg.ActorData actorDatum : actorDataList){
             //build the missing partial history for this node. Iterate backward through the localHistory
-            for(int i=this.localHistory.size(); i>=0)
-        }
+            ActorRef currentReplica = actorDatum.replicaRef;
+            Queue<Snapshot> partialHistory = new LinkedList<Snapshot>(); //queue of the missing updates to be sent to the current replica
 
-
-
-        /*for(Messages.ElectionMsg.ActorData actorDatum : actorData){// tell this to everyone and update all the other nodes
-            Iterator<Snapshot> it = this.localHistory.descendingIterator();
-            LinkedList<Snapshot> partialHistory = new LinkedList<Snapshot>(); //this will be the missing history of this Actor
-            while(it.hasNext()){
-                Snapshot snap = it.next();
-                if(snap.equals(actorDatum.lastUpdate)) //this is the last update of the actor, everything from now on has to be sent to him
-                    break;
-                partialHistory.addFirst(snap);
+            for(int i=this.localHistory.size()-1; i>=0; i--) {//add to the queue the missing updates to send to the current replica
+                if (this.localHistory.get(i).equals(actorDatum.lastUpdate)) break;
+                else partialHistory.add(this.localHistory.get(i));
             }
-            this.getSender().tell(new Messages.ElectionAckMsg(this.getSelf()), this.getSelf());
-
-            this.isInElectionBehavior = false;
-            this.getContext().unbecome();
-            this.getContext().become(coordinatorBehavior());
-            this.setCoordinator(this.getSelf());
-            Messages.SyncMsg sync = new Messages.SyncMsg(this.getSelf(), partialHistory);
-            actorDatum.replicaRef.tell(sync, this.getSelf());
-            this.ventWriteQueue(); //empty the write requests queue
-            this.timeStamp = new TimeId(this.timeStamp.epoch+1, 0);
-            return; */
-
-
-
+            //send updates
+            Messages.SyncMsg syncMsg = new Messages.SyncMsg(partialHistory);
+            currentReplica.tell(syncMsg, this.getSelf());
+        }
     }
 
 
@@ -331,14 +254,10 @@ public class Replica extends AbstractActor {
 
     public void onSyncMsg(Messages.SyncMsg msg) {
         // Handle SyncMsg
-        this.isInElectionBehavior = false;
-        this.getContext().unbecome();
         this.setCoordinator(this.getSender());
+        this.isInElectionBehavior = false;
+        this.getContext().unbecome(); //return to normal behavior
         this.localHistory.addAll(msg.sync);
-        //this.ventWriteQueue();
-        if(!this.writeAckHistory.isEmpty()){
-
-        }
     }
 
     public void onUpdateAckMsg(Messages.UpdateAckMsg msg){// **** work in this to stay alive and timeout while it doesn't receive the ACK cuz this is called each tile it receives an ACK

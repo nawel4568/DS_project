@@ -91,8 +91,8 @@ public abstract class Messages implements Serializable {
 
 
     public static class SyncMsg extends Messages {
-        public final List<Snapshot> sync;
-        public SyncMsg(List<Snapshot> syncHistory) {
+        public final Queue<Snapshot> sync;
+        public SyncMsg(Queue<Snapshot> syncHistory) {
                         this.sync = syncHistory;
         }
     }
