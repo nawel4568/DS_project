@@ -6,6 +6,7 @@ import akka.actor.Props;
 public class Client extends AbstractActor {
     private final static int TIMEOUT = 100;
     private final int clientId;
+    FileAdd file = new FileAdd("output.txt");
 
 
     public Client(int clientId) {
@@ -18,11 +19,11 @@ public class Client extends AbstractActor {
                 .match(Integer.class, this::OnReceiveValue).build();
     }
 
-    public int getClientId(){
-        return clientId;
-    }
 
-    private void OnReceiveValue(Integer val){ System.out.println(getSelf().path().name()+" read done "+val);}
+
+    private void OnReceiveValue(Integer val){
+        file.appendToFile(getSelf().path().name()+" read done "+val);
+        System.out.println(getSelf().path().name()+" read done "+val);}
 
     public static Props props(int clientId) {
         return Props.create(Client.class, () -> new Client(clientId));

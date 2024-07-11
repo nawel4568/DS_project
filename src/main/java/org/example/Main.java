@@ -4,6 +4,7 @@ import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 
+import java.io.FileWriter;
 import java.io.Serializable;
 import java.util.List;
 import java.util.ArrayList;
@@ -16,7 +17,12 @@ import java.util.Random;
 public class Main {
     final static int N_REPLICAS = 6;
     Random rand = new Random();
+
+
     public static void main(String[] args) {
+
+
+
         final ActorSystem system = ActorSystem.create("DistributedSystem");
 
 
@@ -25,14 +31,21 @@ public class Main {
         for (int i=0; i<N_REPLICAS; i++)
             group.add(system.actorOf(Replica.props(i), "Replica" + i));
 
+        // ensure that no one can modify the group
+        group = Collections.unmodifiableList(group);
+
         // Send the Start message to all the Replicas
         Messages.StartMessage start = new Messages.StartMessage(group);
+        //group.get(0).tell(start, ActorRef.noSender());
+
+
         for (ActorRef peer: group) {
-            peer.tell(start, null);
+            peer.tell(start, ActorRef.noSender());
 
         }
 
-        ActorRef replica = system.actorOf(Replica.props(N_REPLICAS), "Replica");
+        //inputContinue();
+
 
         // Create the Clients
         ActorRef client1 = system.actorOf(Client.props(1),"Client1");
@@ -40,23 +53,32 @@ public class Main {
         ActorRef client3 = system.actorOf(Client.props(3),"Client3");
 
 
-        group.get(3).tell(new Messages.WriteReqMsg(5), client1);
-        inputContinue();
+        for(ActorRef peer: group){
+            System.out.println("name: "+peer.path().name());
+            System.out.println("uid: "+peer.path().uid());
+        }
 
-        group.get(2).tell(new Messages.WriteReqMsg(8), client3);
-        inputContinue();
+        /** problem is Coordinator == null **/
+        group.get(3).tell(new Messages.WriteReqMsg(5), client1); // **** Write
+        //inputContinue();
 
-        group.get(5).tell(new Messages.WriteReqMsg(1), client1);
-        inputContinue();
+        group.get(2).tell(new Messages.WriteReqMsg(8), client3); // **** Write
+        //inputContinue();
 
-        group.get(3).tell(new Messages.ReadReqMsg(), client1);
-        inputContinue();
+        group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
+        //inputContinue();
 
-        group.get(4).tell(new Messages.ReadReqMsg(), client2);
-        inputContinue();
+        group.get(5).tell(new Messages.WriteReqMsg(1), client1); // **** Write
+        //inputContinue();
 
-        group.get(1).tell(new Messages.WriteReqMsg(6), client2);
-        inputContinue();
+        group.get(0).tell(new Messages.ReadReqMsg(), client3); // **** Read
+        //inputContinue();
+
+        group.get(4).tell(new Messages.ReadReqMsg(), client2); // **** Read
+        //inputContinue();
+
+        group.get(1).tell(new Messages.WriteReqMsg(6), client2); // **** Write
+        //inputContinue();
 
         system.terminate();
 
@@ -71,3 +93,4 @@ public class Main {
         catch (IOException ignored) {}
     }
 }
+

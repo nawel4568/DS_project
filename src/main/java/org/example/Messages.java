@@ -12,6 +12,10 @@ public abstract class Messages implements Serializable {
         public StartMessage(List<ActorRef> group) {
                         this.group = Collections.unmodifiableList(new ArrayList<>(group));
         }
+
+        public List<ActorRef> getGroup() {
+            return group;
+        }
     }
 
     public static class ReadReqMsg extends Messages {
@@ -67,6 +71,7 @@ public abstract class Messages implements Serializable {
             public final int actorId;
             public final Snapshot lastUpdate;
 
+
             public ActorData(ActorRef replicaRef, int actorId, Snapshot lastUpdate) {
                 this.replicaRef = replicaRef;
                 this.actorId = actorId;
@@ -104,6 +109,10 @@ public abstract class Messages implements Serializable {
         }
     }
 
+
+    public static class MessageDebugging extends Messages{
+
+    }
 
 
 

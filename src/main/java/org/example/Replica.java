@@ -4,6 +4,7 @@ import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Cancellable;
 import akka.actor.Props;
+import akka.io.dns.internal.Message;
 import scala.concurrent.duration.Duration;
 
 import java.util.*;
@@ -11,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 
 
 public class Replica extends AbstractActor {
+    FileAdd file = new FileAdd("output.txt");
+
     //private final static int HEARTBEAT_TIMEOUT = 50;
     //private final static int UPDATEREQ_TIMEOUT = 20;
     //private final static int WRITEOK_TIMEOUT = 20;
@@ -63,6 +66,7 @@ public class Replica extends AbstractActor {
         this.timeoutSchedule = new HashMap<TimeoutType, Cancellable>();
     }
 
+
     private void setTimeout(TimeoutType type){
         Cancellable newTimeout = getContext().system().scheduler().scheduleOnce(
                 Duration.create(type.getMillis(), TimeUnit.MILLISECONDS),
@@ -76,11 +80,11 @@ public class Replica extends AbstractActor {
 
 
     @Override
-    public Receive createReceive() {
-        return replicaBehavior();
-    }
+    //public Receive createReceive() {
+      //  return replicaBehavior();
+    //}
 
-    public Receive replicaBehavior() {
+    public Receive createReceive() {
         return receiveBuilder()
                 .match(Messages.StartMessage.class, this::onStartMessage)
                 .match(Messages.ReadReqMsg.class, this::onReadReqMsg)
@@ -109,7 +113,12 @@ public class Replica extends AbstractActor {
                 .match(Messages.ReadReqMsg.class, this::onReadReqMsg)
                 .match(Messages.WriteReqMsg.class, this::onWriteReqMsg)
                 .match(Messages.UpdateAckMsg.class, this::onUpdateAckMsg)
+                .match(Messages.MessageDebugging.class, this::onDebuggingMsg)
                 .build();
+    }
+
+    public void onDebuggingMsg(Messages.MessageDebugging msg){
+        System.out.println("onDebuggingMsg");
     }
 
     public Receive crashedBehavior() {
@@ -134,8 +143,21 @@ public class Replica extends AbstractActor {
 
 
     public void onStartMessage(Messages.StartMessage msg) {
+
         setGroup(msg);
-        setTimeout(TimeoutType.HEARTBEAT);
+        if(getSelf().equals(msg.group.get(0))){
+            System.out.println("Replica " + replicaId + " started as a coordinator");
+            System.out.flush();
+            getContext().become(coordinatorBehavior());
+            getSelf().tell(new Messages.MessageDebugging(), ActorRef.noSender());
+        }
+        System.out.println("Replica " + replicaId + " started");
+        System.out.flush();
+        groupOfReplicas = msg.getGroup();
+        this.coordinator = groupOfReplicas.get(0);
+
+
+
     }
 
     public void crash(int interval) {
@@ -145,6 +167,7 @@ public class Replica extends AbstractActor {
 
     public void onReadReqMsg(Messages.ReadReqMsg req) {
         // Handle ReadReqMsg
+        file.appendToFile(getSender().path().name()+" read req to "+getSelf().path().name());
         System.out.println(getSender().path().name()+" read req to "+getSelf().path().name()); // getSender().path().name : returns the name of the sender actor
         this.getSender().tell(localHistory.get(localHistory.size()-1).getV(), getSelf());
     }
@@ -152,6 +175,7 @@ public class Replica extends AbstractActor {
     public void onWriteReqMsg(Messages.WriteReqMsg req) {
         // Handle WriteReqMsg
         if(getSelf().equals(coordinator)){
+
             // if the replica is the coordinator
             timeStamp = new TimeId(timeStamp.epoch, timeStamp.seqNum+1);
             Snapshot snap = new Snapshot(timeStamp, req.getV(),false);
@@ -159,7 +183,9 @@ public class Replica extends AbstractActor {
 
             Messages.UpdateMsg updateMsg = new Messages.UpdateMsg(snap); // create the update message with our Snapshot
             for (ActorRef replica: groupOfReplicas){ // Broadcast the Update message to all the Replicas
-                replica.tell(updateMsg, ActorRef.noSender());
+                if(!replica.equals(coordinator)){
+                    replica.tell(updateMsg, ActorRef.noSender());
+                }
             }
         }else{ // if the Replica is not the coordinator
             coordinator.tell(req, ActorRef.noSender());
@@ -176,7 +202,9 @@ public class Replica extends AbstractActor {
     public void onUpdateMsg(Messages.UpdateMsg msg) {
         // Handle UpdateMsg
         localHistory.add(msg.snap); // add the unstable message to the replicas localHistory
-        coordinator.tell(new Messages.UpdateAckMsg(msg.snap.getTimeId()), ActorRef.noSender()); //send the Ack of this specific message with associating the timeId of the message
+        Messages.UpdateAckMsg updateAckMsg = new Messages.UpdateAckMsg(msg.snap.getTimeId());
+
+        coordinator.tell(updateAckMsg, ActorRef.noSender()); //send the Ack of this specific message with associating the timeId of the message
     }
 
     public void onWriteOKMsg(Messages.WriteOKMsg msg) {
@@ -185,6 +213,8 @@ public class Replica extends AbstractActor {
         int lastSeqNum = this.localHistory.get(this.localHistory.size()-1).getTimeId().seqNum; //eqNum of the last msg in the array
         int seqNumDiff = msg.uid.seqNum - lastSeqNum; //difference between the last msg and the msg that I want (channels are FIFO, msgs are always ordered)
         this.localHistory.get((this.localHistory.size()-1) - seqNumDiff).setStable(true); //set stable the message
+        file.appendToFile(getSelf().path().name()+" update "+msg.uid.epoch+" : "+msg.uid.seqNum+" "+this.localHistory.get(this.localHistory.size()-1).getV());
+
     }
 
 
@@ -258,9 +288,12 @@ public class Replica extends AbstractActor {
         this.isInElectionBehavior = false;
         this.getContext().unbecome(); //return to normal behavior
         this.localHistory.addAll(msg.sync);
+        setTimeout(TimeoutType.HEARTBEAT);
     }
 
     public void onUpdateAckMsg(Messages.UpdateAckMsg msg){// **** work in this to stay alive and timeout while it doesn't receive the ACK cuz this is called each tile it receives an ACK
+        System.out.println("onUpdateAckMsg");
+        System.out.flush();
         if(!localHistory.get(msg.uid.seqNum-1).getStable()){
             if(!quorum.containsKey(msg.uid)){
                 quorum.put(msg.uid, 2); // the quorum == 2 because the coordinator ACK + the replicas ACK
@@ -268,9 +301,12 @@ public class Replica extends AbstractActor {
                 quorum.put(msg.uid, quorum.get(msg.uid) + 1);
                 if(quorum.get(msg.uid) >= (groupOfReplicas.size()/2+1)){
                     localHistory.get(msg.uid.seqNum-1).setStable(true);
+                    file.appendToFile(getSelf().path().name()+" update "+msg.uid.epoch+" : "+msg.uid.seqNum+" "+this.localHistory.get(this.localHistory.size()-1).getV());
                     Messages.WriteOKMsg writeOk= new Messages.WriteOKMsg(msg.uid);
+
                     for (ActorRef replica: groupOfReplicas){
-                        replica.tell(writeOk, getSelf());
+                        if(!getSelf().equals(replica))
+                            replica.tell(writeOk, getSelf());
                     }
                     quorum.remove(msg.uid);
                 }
@@ -286,6 +322,8 @@ public class Replica extends AbstractActor {
             this.coordinator.tell(writeReqMsgQueue.remove(), this.getSelf());
 
     } */
+
+
 
 
 
