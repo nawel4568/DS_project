@@ -1,0 +1,3 @@
+Client1 read req to Replica3
+Client2 read req to Replica4
+Client3 read req to Replica0
