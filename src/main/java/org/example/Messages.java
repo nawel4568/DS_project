@@ -20,6 +20,7 @@ public abstract class Messages implements Serializable {
 
     public static class ReadReqMsg extends Messages {
         public ReadReqMsg() {
+
                     }
     }
 

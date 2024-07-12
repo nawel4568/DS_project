@@ -21,6 +21,8 @@ public class Main {
 
     public static void main(String[] args) {
 
+        Utils.clearFileContent("output.txt");
+
 
 
         final ActorSystem system = ActorSystem.create("DistributedSystem");
@@ -37,12 +39,34 @@ public class Main {
         // Send the Start message to all the Replicas
         Messages.StartMessage start = new Messages.StartMessage(group);
         //group.get(0).tell(start, ActorRef.noSender());
-
+        System.out.println("Entering the loop for sending the start messages...");
+        System.out.flush();
 
         for (ActorRef peer: group) {
             peer.tell(start, ActorRef.noSender());
 
         }
+        System.out.println("Entering sleep block...");
+        System.out.flush();
+        inputContinue();
+        try {
+            Thread.sleep((1000));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        //Arbitrarily pick a replica for initializing the value
+        group.get(1).tell(new Messages.WriteReqMsg(-1), ActorRef.noSender()); // **** Write
+        System.out.println("Just sended the message of the sleep block...");
+                System.out.flush();
+
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("I am out of the sleep sleep block");
+                System.out.flush();
 
         //inputContinue();
 
@@ -53,22 +77,67 @@ public class Main {
         ActorRef client3 = system.actorOf(Client.props(3),"Client3");
 
 
-        for(ActorRef peer: group){
-            System.out.println("name: "+peer.path().name());
-            System.out.println("uid: "+peer.path().uid());
-        }
-
         /** problem is Coordinator == null **/
         group.get(3).tell(new Messages.WriteReqMsg(5), client1); // **** Write
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         //inputContinue();
 
-        group.get(2).tell(new Messages.WriteReqMsg(8), client3); // **** Write
+        group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        group.get(3).tell(new Messages.WriteReqMsg(4), client1); // **** Write`
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        group.get(3).tell(new Messages.WriteReqMsg(9), client1); // **** Write
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        group.get(3).tell(new Messages.ReadReqMsg(), client1);
+
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        /** group.get(2).tell(new Messages.WriteReqMsg(8), client3); // **** Write
+        try {
+            Thread.sleep(1);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         //inputContinue();
 
         group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
         //inputContinue();
 
         group.get(5).tell(new Messages.WriteReqMsg(1), client1); // **** Write
+        try {
+            Thread.sleep(1);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         //inputContinue();
 
         group.get(0).tell(new Messages.ReadReqMsg(), client3); // **** Read
@@ -78,6 +147,8 @@ public class Main {
         //inputContinue();
 
         group.get(1).tell(new Messages.WriteReqMsg(6), client2); // **** Write
+        //inputContinue();**/
+
         //inputContinue();
 
         system.terminate();
