@@ -272,7 +272,9 @@ public class Replica extends AbstractActor {
     }
 
     public void onElectionAckMsg(Messages.ElectionAckMsg msg){
-        this.setTimeout(TimeoutType.ELECTION_ACK);
+        Cancellable electionACKTimeout = this.timeoutSchedule.get(TimeoutType.ELECTION_ACK);
+        electionACKTimeout.cancel();
+        this.timeoutSchedule.remove(TimeoutType.ELECTION_ACK);
         System.out.println("Replica "+getSelf().path().name() + " received ElectionACKMsg from "+ getSender().path().name());
         System.out.flush();
     }
@@ -281,6 +283,7 @@ public class Replica extends AbstractActor {
         if (!isInElectionBehavior) {
             this.getContext().become(replicaDuringElectionBehavior());
             isInElectionBehavior = true;
+            this.setTimeout(TimeoutType.ELECTION_PROTOCOL);
             System.out.println("Replica "+getSelf().path().name() + " received ElectionMsg from "+ getSender().path().name()+ "and is turning in election behavior");
             System.out.flush();
         }
@@ -296,6 +299,7 @@ public class Replica extends AbstractActor {
                 if(0 < comp || ( comp == 0 && actorDatum.actorId > this.replicaId )){
                     //if someone else has more recent update or has the same update but highest ID than you then forward and return
                     this.successor.tell(msg, this.getSelf());
+                    this.setTimeout(TimeoutType.ELECTION_ACK);
                     this.getSender().tell(new Messages.ElectionAckMsg(), this.getSelf());
                     System.out.println("Replica "+getSelf().path().name() + " loses the election and forwards to "+ this.successor);
                     System.out.flush();
@@ -351,6 +355,7 @@ public class Replica extends AbstractActor {
         // Handle HeartbeatMsg
         Cancellable heartbeatTimeout = this.timeoutSchedule.get(TimeoutType.RECEIVE_HEARTBEAT);
         heartbeatTimeout.cancel();
+        this.timeoutSchedule.remove(TimeoutType.RECEIVE_HEARTBEAT);
         this.setTimeout(TimeoutType.RECEIVE_HEARTBEAT);
     }
 
@@ -362,6 +367,9 @@ public class Replica extends AbstractActor {
         this.isInElectionBehavior = false;
         this.localHistory.addAll(msg.sync);
         this.getContext().unbecome(); //return to normal behavior
+        Cancellable electionProtocolTimeout = this.timeoutSchedule.get(TimeoutType.ELECTION_PROTOCOL);
+        electionProtocolTimeout.cancel();
+        this.timeoutSchedule.remove(TimeoutType.ELECTION_PROTOCOL);
         setTimeout(TimeoutType.RECEIVE_HEARTBEAT);
     }
 
