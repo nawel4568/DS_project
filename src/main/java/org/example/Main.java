@@ -46,6 +46,7 @@ public class Main {
             peer.tell(start, ActorRef.noSender());
 
         }
+        inputContinue();
         System.out.println("Entering sleep block...");
         System.out.flush();
         inputContinue();
