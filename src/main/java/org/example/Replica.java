@@ -1,9 +1,6 @@
 package org.example;
 
-import akka.actor.AbstractActor;
-import akka.actor.ActorRef;
-import akka.actor.Cancellable;
-import akka.actor.Props;
+import akka.actor.*;
 import scala.concurrent.duration.Duration;
 
 import java.util.*;
@@ -119,6 +116,7 @@ public class Replica extends AbstractActor {
                 .match(Messages.WriteOKMsg.class, this::onWriteOKMsg)
                 .match(Messages.ElectionMsg.class, this::onElectionMsg)
                 .match(Messages.HeartbeatMsg.class, this::onHeartbeatMsg)
+                .match(Messages.TimeoutMsg.class, this::onTimeoutMsg)
                 .build();
     }
 
@@ -197,6 +195,20 @@ public class Replica extends AbstractActor {
         // Optionally handle the duration for which the actor should remain in the crashed state
     }
 
+    public void onTimeoutMsg(Messages.TimeoutMsg msg){
+        switch (msg.type){
+            case WRITEOK, RECEIVE_HEARTBEAT, UPDATE_REQ:
+                ArrayList<Messages.ElectionMsg.ActorData> actorData = new ArrayList<Messages.ElectionMsg.ActorData>();
+                if(!localHistory.isEmpty())
+                    actorData.add(new Messages.ElectionMsg.ActorData(getSelf(),this.replicaId,this.localHistory.get(this.localHistory.size()-1)));
+                else
+                    actorData.add(new Messages.ElectionMsg.ActorData(getSelf(),this.replicaId,null));
+                getSelf().tell(new Messages.ElectionMsg(this.timeStamp.epoch, actorData),ActorRef.noSender());
+                break;
+        }
+    }
+
+
     public void onReadReqMsg(Messages.ReadReqMsg req) {
         System.out.println("Replica "+getSelf().path().name() + " received ReadRequest from "+getSender().path().name());
         System.out.flush();
@@ -205,7 +217,7 @@ public class Replica extends AbstractActor {
         file.appendToFile(getSender().path().name()+" read req to "+getSelf().path().name());
         System.out.println(getSender().path().name()+" read req to "+getSelf().path().name()); // getSender().path().name : returns the name of the sender actor
         int i;
-        for(i=localHistory.size()-1; i>=0 && !localHistory.get(i).getStable(); i--);
+        for(i=this.localHistory.size()-1; i>=0 && !this.localHistory.get(i).getStable(); i--);
 
 
         if(!localHistory.isEmpty())
@@ -221,13 +233,13 @@ public class Replica extends AbstractActor {
             System.out.println("Coordinator "+getSelf().path().name() + " received writereq from "+getSender().path().name()+" with value "+ req.getV());
             System.out.flush();
             // if the replica is the coordinator
-            timeStamp = new TimeId(timeStamp.epoch, timeStamp.seqNum+1);
+            timeStamp = new TimeId(this.timeStamp.epoch, this.timeStamp.seqNum+1);
             Snapshot snap = new Snapshot(timeStamp, req.getV(),false);
             this.localHistory.add(snap); // add the Msg to the local history of the coordinator with a specification that it's unstable
 
             Messages.UpdateMsg updateMsg = new Messages.UpdateMsg(snap); // create the update message with our Snapshot
-            for (ActorRef replica: groupOfReplicas){ // Broadcast the Update message to all the Replicas
-                if(!replica.equals(coordinator)){
+            for (ActorRef replica: this.groupOfReplicas){ // Broadcast the Update message to all the Replicas
+                if(!replica.equals(this.coordinator)){
                     System.out.println("Coordinator "+getSelf().path().name() + " is sending the update msg to replica "+replica.path().name());
                     System.out.flush();
                     replica.tell(updateMsg, this.getSelf());
