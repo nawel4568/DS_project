@@ -67,7 +67,35 @@ public abstract class Messages implements Serializable {
     }
 
     public static class ElectionMsg extends Messages {
-        public static final class ActorData{
+        public static class ElectionID{ //class for distinguishing different instances of the protocol within an epoch
+            public final int initiatorID; //ref of the initiator
+            public final int locCounter; //local counter (of the initiator) of the number of election instances initiated
+
+            public static ElectionID defaultElectionID(){ //ID that will always be preempted by other IDs in priority comparison
+                return new ElectionID(Integer.MAX_VALUE,  Integer.MIN_VALUE);
+            }
+            public ElectionID(int init, int counter){
+                this.initiatorID = init;
+                this.locCounter = counter;
+            }
+
+            public int comparePriority(ElectionID other) {
+                // If this initiatorID is less than the other's initiatorID, this has higher priority
+                if (this.initiatorID < other.initiatorID) return 1;
+                // If this initiatorID is greater than the other's initiatorID, other has higher priority
+                else if (this.initiatorID > other.initiatorID) return -1;
+                // If initiatorIDs are equal, compare locCounter
+                else
+                    // If this locCounter is greater than the other's locCounter, this has higher priority
+                    if (this.locCounter > other.locCounter) return 1;
+                    // If this locCounter is less than the other's locCounter, other has higher priority
+                    else if (this.locCounter < other.locCounter) return -1;
+                    // If both initiatorID and locCounter are equal, they have equal priority (not possible)
+                    else return 0;
+
+            }
+        }
+        public static final class ActorData{ //class for exchanging data about the replicas
             public final ActorRef replicaRef;
             public final int actorId;
             public final Snapshot lastUpdate;
@@ -79,11 +107,12 @@ public abstract class Messages implements Serializable {
                 this.lastUpdate = lastUpdate;
             }
         }
-        public final int epochNumber;
         public final List<ActorData> actorDatas;
+        public final ElectionID instanceID;
 
-        public ElectionMsg(int epochNum, List<ActorData> actorUpdates) {
-            this.epochNumber = epochNum;
+        public ElectionMsg(ElectionID instanceID, List<ActorData> actorUpdates) {
+            //this.id = id;
+            this.instanceID = instanceID;
             this.actorDatas = Collections.unmodifiableList(new ArrayList<ActorData>(actorUpdates));
         }
 

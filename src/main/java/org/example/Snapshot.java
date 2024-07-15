@@ -9,16 +9,23 @@ import java.util.Objects;
 
 public class Snapshot {
     private final TimeId timeId;
-    private final int v;
+    private final Integer v;
     private boolean stable;
-    public Snapshot(TimeId timeId, int v, boolean stable) {
+
+    public static Snapshot defaultSnapshot(){
+        return new Snapshot(new TimeId(-1,-1), null, true);
+    }
+
+    public Snapshot(TimeId timeId, Integer v, boolean stable) {
         this.timeId = timeId;
         this.v = v;
         this.stable = stable;
     }
+
     public TimeId getTimeId() {
         return timeId;
     }
+
     public int getV(){ return v; }
     public void setStable(boolean isStable) {
         this.stable=isStable;

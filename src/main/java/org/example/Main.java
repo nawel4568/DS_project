@@ -15,7 +15,7 @@ import java.util.Random;
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
-    final static int N_REPLICAS = 6;
+    final static int N_REPLICAS = 3;
     Random rand = new Random();
 
 
@@ -44,6 +44,11 @@ public class Main {
 
         for (ActorRef peer: group) {
             peer.tell(start, ActorRef.noSender());
+            try {
+                Thread.sleep((50));
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
 
         }
         inputContinue();
@@ -51,11 +56,12 @@ public class Main {
         System.out.flush();
         inputContinue();
         try {
-            Thread.sleep((1000));
+            Thread.sleep((10000));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-
+        System.out.println("------after the enter------");
+        System.out.flush();
         //Arbitrarily pick a replica for initializing the value
         group.get(1).tell(new Messages.WriteReqMsg(-1), ActorRef.noSender()); // **** Write
         System.out.println("Just sended the message of the sleep block...");
