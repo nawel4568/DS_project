@@ -41,15 +41,16 @@ public class Replica extends AbstractActor {
     private Snapshot lastKnownUpdate;
 
 
-    private Random rand = new Random();
 
     public enum TimeoutType{
-        UPDATE_REQ(200),
+        UPDATE(200),
         WRITEOK(200),
         ELECTION_ACK(200),
         ELECTION_PROTOCOL(10000),
         RECEIVE_HEARTBEAT(2000),
         SEND_HEARTBEAT(300);
+
+
 
         private final int millis;
         TimeoutType(int millis){
@@ -83,11 +84,11 @@ public class Replica extends AbstractActor {
     private void setTimeout(TimeoutType type){
         if(type.equals(TimeoutType.SEND_HEARTBEAT)){
             if(DEBUG){
-                System.out.println("The new coordinator " + getSelf().path().name() + " is scheduling the heartbeat in the setTimeout method");
+                System.out.println("setTimeout: The new coordinator ** " + this.getSelf().path().name() + " ** is scheduling the heartbeat");
                 System.out.flush();
             }
-            for (ActorRef replica: groupOfReplicas){
-                if(!replica.equals(coordinator)){
+            for (ActorRef replica: this.groupOfReplicas){
+                if(!replica.equals(this.coordinator)){
                     Cancellable newTimeout = getContext().getSystem().scheduler().scheduleAtFixedRate(
                             Duration.Zero(),
                             Duration.create(type.getMillis(), TimeUnit.MILLISECONDS),
@@ -102,7 +103,7 @@ public class Replica extends AbstractActor {
             }
         }else{
             if(DEBUG){
-                System.out.println(getSelf().path().name() + " is scheduling the timeout of type: " + type.name());
+                System.out.println("setTimeout: ** "+this.getSelf().path().name() + " ** is scheduling the timeout: " + type.name());
                 System.out.flush();
             }
             Cancellable newTimeout = getContext().system().scheduler().scheduleOnce(
@@ -245,7 +246,7 @@ public class Replica extends AbstractActor {
 
         Map<Integer, Messages.ElectionMsg.ActorData> actorData;
         switch (msg.type){
-            case WRITEOK, RECEIVE_HEARTBEAT, UPDATE_REQ, ELECTION_PROTOCOL:
+            case WRITEOK, RECEIVE_HEARTBEAT, UPDATE, ELECTION_PROTOCOL:
                 //coordinator crashed
                 this.getContext().become(this.replicaDuringElectionBehavior());
 
@@ -287,23 +288,14 @@ public class Replica extends AbstractActor {
 
 
     public void onReadReqMsg(Messages.ReadReqMsg req) {
-        if(DEBUG){
-            System.out.println("Replica " + getSelf().path().name() + " received ReadRequest from " + getSender().path().name());
-            System.out.flush();
-        }
-
         // Handle ReadReqMsg
-        file.appendToFile(getSender().path().name()+" read req to "+getSelf().path().name());
-        if(DEBUG){
-            System.out.println(getSender().path().name() + " read req to " + getSelf().path().name()); // getSender().path().name : returns the name of the sender actor
-        }
+        file.appendToFile(this.getSender().path().name()+" read req to "+this.getSelf().path().name());
         int i;
         for(i=this.localHistory.size()-1; i>=0 && !this.localHistory.get(i).isStable(); i--);
-
         if(!localHistory.isEmpty())
-            this.getSender().tell(localHistory.get(i).getV(), getSelf());
+            this.getSender().tell(this.localHistory.get(i).getV(), this.getSelf());
         else{
-            this.getSender().tell(Snapshot.defaultSnapshot().getV(), getSelf());
+            this.getSender().tell(Snapshot.defaultSnapshot().getV(), this.getSelf());
         }
     }
 
@@ -316,75 +308,95 @@ public class Replica extends AbstractActor {
             }
             // if the replica is the coordinator
             timeStamp = new TimeId(this.timeStamp.epoch, this.timeStamp.seqNum+1);
-            Snapshot snap = new Snapshot(timeStamp, req.getV(),false);
+            Snapshot snap = new Snapshot(this.timeStamp, req.getV(),false);
             this.localHistory.add(snap); // add the Msg to the local history of the coordinator with a specification that it's unstable
 
             Messages.UpdateMsg updateMsg = new Messages.UpdateMsg(snap); // create the update message with our Snapshot
             for (ActorRef replica: this.groupOfReplicas){ // Broadcast the Update message to all the Replicas
                 if(!replica.equals(this.coordinator)){
                     if(DEBUG){
-                        System.out.println("Coordinator " + getSelf().path().name() + " is sending the update msg to replica " + replica.path().name());
-                        System.out.flush();
+                        System.out.println("onWriteReqMsg: Coordinator ** " + this.getSelf().path().name() + " ** is sending the update msg to replica ** " + replica.path().name()+" **");
                     }
                     replica.tell(updateMsg, this.getSelf());
-                    /***  crashed  ***/
-                    a++;
-                    if(a==13){
-                        file.appendToFile("the coordinator Crashed");
-                        if(DEBUG){
-                            System.out.println("------ " + getSelf().path().name() + " is CRASHED ------");
-                            System.out.flush();
-                        }
-
-                       this.crash();
-                    }
-
                 }
             }
         }else{ // if the Replica is not the coordinator
             if(DEBUG){
-                System.out.println("Replica " + getSelf().path().name() + " received writereq from " + getSender().path().name() + " with value " + req.getV() + " and is forwarding to coordinator " + coordinator.path().name());
+                System.out.println("onWriteReqMsg: The ** " + this.getSelf().path().name() + " ** is not the coordinator so it forward the message to the Coordinator ** " + this.coordinator.path().name()+" **");
                 System.out.flush();
             }
-            coordinator.tell(req, this.getSelf());
+            setTimeout(TimeoutType.UPDATE);
+            this.coordinator.tell(req, this.getSelf());
+
         }
-
-
     }
+
 
     public void onUpdateMsg(Messages.UpdateMsg msg) {
         // Handle UpdateMsg
-        localHistory.add(msg.snap); // add the unstable message to the replicas localHistory
+        this.timeoutSchedule.remove(TimeoutType.UPDATE).cancel(); // canceling the Update timeout of the replica
+        this.localHistory.add(msg.snap); // add the unstable message to the replicas localHistory
         if(DEBUG){
-            System.out.println("Replica " + getSelf().path().name() + " received updateMsg from " + getSender().path().name());
+            System.out.println("onUpdateMsg: ** " + getSelf().path().name() + " ** received update message from ** " + getSender().path().name()+" **");
             System.out.flush();
         }
         Messages.UpdateAckMsg updateAckMsg = new Messages.UpdateAckMsg(msg.snap.getTimeId());
+        setTimeout(TimeoutType.WRITEOK);
+        this.coordinator.tell(updateAckMsg, this.getSelf()); //send the Ack of this specific message with associating the timeId of the message
+    }
 
-        coordinator.tell(updateAckMsg, this.getSelf()); //send the Ack of this specific message with associating the timeId of the message
+    public void onUpdateAckMsg(Messages.UpdateAckMsg msg){// **** work in this to stay alive and timeout while it doesn't receive the ACK cuz this is called each tile it receives an ACK
+        if(DEBUG){
+            System.out.println("onUpdateAckMsg: ** "+this.getSelf().path().name() + " received updateACK from ** " + this.getSender().path().name()+" **");
+        }
+
+        if(!this.localHistory.get(msg.updateID.seqNum-1).isStable()){
+            if(!this.quorum.containsKey(msg.updateID)){
+                this.quorum.put(msg.updateID, 2); // the quorum == 2 because the coordinator ACK + the replicas ACK
+                if(DEBUG){
+                    System.out.println(" ----- ADD NEW Quorum for update (" + msg.updateID.epoch + "/" + msg.updateID.seqNum + ") is " + this.quorum.get(msg.updateID)+" -----");
+                }
+            }else{
+                this.quorum.put(msg.updateID, quorum.get(msg.updateID) + 1);
+                if(DEBUG){
+                    System.out.println(" ----- Quorum for update (" + msg.updateID.epoch + "/" + msg.updateID.seqNum + ") is " + this.quorum.get(msg.updateID)+" -----");
+                }
+                if(this.quorum.get(msg.updateID) >= (this.groupOfReplicas.size()/2+1)){
+                    if(DEBUG){
+                        System.out.println(" ----- Set the message" + msg.updateID.epoch + "/" + msg.updateID.seqNum + ") to Stable -----");
+                        System.out.flush();
+                    }
+                    this.localHistory.get(msg.updateID.seqNum-1).setStable(true);
+                    Messages.WriteOKMsg writeOk= new Messages.WriteOKMsg(msg.updateID);
+                    for (ActorRef replica: this.groupOfReplicas){
+                        if(!this.getSelf().equals(replica))
+                            replica.tell(writeOk, this.getSelf());
+                    }
+                    this.quorum.remove(msg.updateID);
+                }
+            }
+        }
     }
 
     public void onWriteOKMsg(Messages.WriteOKMsg msg) {
         // Handle WriteOKMsg
+        this.timeoutSchedule.remove(TimeoutType.WRITEOK).cancel(); // Canceling the WriteOk timeout of the replica
         if(DEBUG){
-            System.out.println("replica " + getSelf().path().name() + " received writeOKmsg of the msg with timestamp: " + msg.updateID.toString() + " from " + getSender().path().name());
-            System.out.flush();
+            System.out.println("onWriteOKMsg: ** " + this.getSelf().path().name() + "** received writeOK message of the message with timestamp: " + msg.updateID.toString() + " from ** " + this.getSender().path().name()+" **");
         }
         //we need to keep the whole history across the epochs, so I do some stuff to get the index
         int lastSeqNum = this.localHistory.get(this.localHistory.size()-1).getTimeId().seqNum; //eqNum of the last msg in the array
         int seqNumDiff =  lastSeqNum - msg.updateID.seqNum; //difference between the last msg and the msg that I want (channels are FIFO, msgs are always ordered)
         this.localHistory.get((this.localHistory.size()-1) - seqNumDiff).setStable(true); //set stable the message
         if(DEBUG){
-            System.out.println(getSelf().path().name() + " update with " + msg.updateID.toString() + " " + this.localHistory.get((this.localHistory.size() - 1) - seqNumDiff).getV());
+            System.out.println(" ----- ** "+this.getSelf().path().name() + "** update " + msg.updateID.toString() + " " + this.localHistory.get((this.localHistory.size() - 1) - seqNumDiff).getV()+" -----");
             System.out.flush();
         }
-        file.appendToFile(getSelf().path().name()+" update with"+ msg.updateID.toString() +" "+this.localHistory.get((this.localHistory.size()-1) - seqNumDiff).getV());
-
+        file.appendToFile(this.getSelf().path().name()+" update "+msg.updateID.epoch+" : "+msg.updateID.seqNum+" "+this.localHistory.get((this.localHistory.size()-1) - seqNumDiff).getV());
     }
 
     public void onElectionAckMsg(Messages.ElectionAckMsg msg){
-        Cancellable electionACKTimeout = this.timeoutSchedule.remove(TimeoutType.ELECTION_ACK);
-        electionACKTimeout.cancel();
+        this.timeoutSchedule.remove(TimeoutType.ELECTION_ACK).cancel();
         this.cachedMsg = null;
         if(DEBUG){
             System.out.println("Replica " + getSelf().path().name() + " received ElectionACKMsg from " + getSender().path().name() + ", so it has canceled the ElectionACK timout");
@@ -547,39 +559,7 @@ public class Replica extends AbstractActor {
         setTimeout(TimeoutType.RECEIVE_HEARTBEAT);
     }
 
-    public void onUpdateAckMsg(Messages.UpdateAckMsg msg){// **** work in this to stay alive and timeout while it doesn't receive the ACK cuz this is called each tile it receives an ACK
-        if(DEBUG){
-            System.out.println(getSelf().path().name() + " received updateACK from " + getSender().path().name());
-            System.out.flush();
-            System.out.println("onUpdateAckMsg");
-            System.out.flush();
-        }
-        if(!localHistory.get(msg.updateID.seqNum-1).isStable()){
-            if(!quorum.containsKey(msg.updateID)){
-                quorum.put(msg.updateID, 2); // the quorum == 2 because the coordinator ACK + the replicas ACK
-                if(DEBUG){
-                    System.out.println("Quorum for update with "+ msg.updateID.toString() + " is " + quorum.get(msg.updateID));
-                    System.out.flush();
-                }
-            }else{
-                quorum.put(msg.updateID, quorum.get(msg.updateID) + 1);
-                if(DEBUG){
-                    System.out.println("Quorum for update with "+ msg.updateID.toString() + " is " + quorum.get(msg.updateID));
-                    System.out.flush();
-                }
-                if(quorum.get(msg.updateID) >= (groupOfReplicas.size()/2+1)){
-                    localHistory.get(msg.updateID.seqNum-1).setStable(true);
 
-                    Messages.WriteOKMsg writeOk= new Messages.WriteOKMsg(msg.updateID);
-
-                    for (ActorRef replica: groupOfReplicas){
-                        if(!getSelf().equals(replica))
-                            replica.tell(writeOk, getSelf());
-                    }
-                    quorum.remove(msg.updateID);
-                }
-            }
-        }
 
     }
 
