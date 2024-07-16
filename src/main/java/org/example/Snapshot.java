@@ -1,10 +1,5 @@
 package org.example;
 
-import akka.util.DoubleLinkedList;
-
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
 import java.util.Objects;
 
 public class Snapshot {
@@ -13,7 +8,7 @@ public class Snapshot {
     private boolean stable;
 
     public static Snapshot defaultSnapshot(){
-        return new Snapshot(new TimeId(-1,-1), null, true);
+        return new Snapshot(new TimeId(Integer.MIN_VALUE,Integer.MIN_VALUE), null, true);
     }
 
     public Snapshot(TimeId timeId, Integer v, boolean stable) {
@@ -23,14 +18,14 @@ public class Snapshot {
     }
 
     public TimeId getTimeId() {
-        return timeId;
+        return this.timeId;
     }
 
-    public int getV(){ return v; }
-    public void setStable(boolean isStable) {
-        this.stable=isStable;
+    public int getV(){ return this.v; }
+    public void setStable(boolean stable) {
+        this.stable = stable;
     }
-    public boolean getStable(){ return stable; }
+    public boolean isStable(){ return this.stable; }
 
     @Override
     public int hashCode() {
@@ -39,14 +34,21 @@ public class Snapshot {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null || getClass() != obj.getClass()) {
-            return false;
-        }
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+
         Snapshot other = (Snapshot) obj;
-        return v == other.v && stable == other.stable && Objects.equals(timeId, other.timeId);
+        return Objects.equals(this.v, other.v) && this.stable == other.stable && Objects.equals(this.timeId, other.timeId);
     }
+
+    @Override
+    public String toString() {
+        return "Snapshot{" +
+                "timeId=" + timeId +
+                ", v=" + v +
+                ", stable=" + stable +
+                '}';
+    }
+
 
 }

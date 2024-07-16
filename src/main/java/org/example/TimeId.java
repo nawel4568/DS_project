@@ -20,16 +20,22 @@ public class TimeId implements Comparable<TimeId> {
     }
 
     @Override
-    public int compareTo(TimeId other) {
-        if (this.epoch != other.epoch) {
-            return Integer.compare(this.epoch, other.epoch);
-        } else {
-            return Integer.compare(this.seqNum, other.seqNum);
-        }
+    public int compareTo(TimeId other) { //return 1 if this > other, -1 otherwise
+        if (this.epoch != other.epoch) return Integer.compare(this.epoch, other.epoch);
+         else return Integer.compare(this.seqNum, other.seqNum);
     }
 
     @Override
     public int hashCode(){
         return Objects.hash(epoch, seqNum);
     }
+
+    @Override
+    public String toString() {
+        return "TimeId{" +
+                "epoch=" + epoch +
+                ", seqNum=" + seqNum +
+                '}';
+    }
+
 }
