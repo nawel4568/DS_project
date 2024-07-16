@@ -84,6 +84,7 @@ public class Replica extends AbstractActor {
     private void setTimeout(TimeoutType type){
         if(type.equals(TimeoutType.SEND_HEARTBEAT)){
             if(DEBUG){
+
                 System.out.println("setTimeout: The new coordinator ** " + this.getSelf().path().name() + " ** is scheduling the heartbeat");
                 System.out.flush();
             }
@@ -103,8 +104,8 @@ public class Replica extends AbstractActor {
             }
         }else{
             if(DEBUG){
-                System.out.println("setTimeout: ** "+this.getSelf().path().name() + " ** is scheduling the timeout: " + type.name());
-                System.out.flush();
+                //System.out.println("setTimeout: ** "+this.getSelf().path().name() + " ** is scheduling the timeout: " + type.name());
+                //System.out.flush();
             }
             Cancellable newTimeout = getContext().system().scheduler().scheduleOnce(
                     Duration.create(type.getMillis(), TimeUnit.MILLISECONDS),
@@ -275,7 +276,7 @@ public class Replica extends AbstractActor {
                     this.successor = this.groupOfReplicas.get((this.groupOfReplicas.indexOf(oldSuccessor) + 1) % this.groupOfReplicas.size());
 
                     if(DEBUG){
-                        System.out.println(getSelf().path().name() + " has timed out for election ack of the old successor " + this.successor.path().name() + " and is changing the successor to the new one: " + this.successor.path().name());
+                        System.out.println(getSelf().path().name() + " has timed out for election ack of the old successor " + oldSuccessor.path().name() + " and is changing the successor to the new one: " + this.successor.path().name());
                         System.out.flush();
                     }
 
@@ -315,9 +316,9 @@ public class Replica extends AbstractActor {
             for (ActorRef replica: this.groupOfReplicas){ // Broadcast the Update message to all the Replicas
                 if(!replica.equals(this.coordinator)){
                     if(DEBUG){
-                        System.out.println("onWriteReqMsg: Coordinator ** " + this.getSelf().path().name() + " ** is sending the update msg to replica ** " + replica.path().name()+" **");
+                        System.out.println("onWriteReqMsg: Coordinator ** " + this.getSelf().path().name() + " ** is sending the update msg with the value: "+req.getV()+" to replica ** " + replica.path().name()+" **");
                     }
-                    replica.tell(updateMsg, this.getSelf());
+                    replica.tell(updateMsg, this.getSender());
                 }
             }
         }else{ // if the Replica is not the coordinator
@@ -334,7 +335,8 @@ public class Replica extends AbstractActor {
 
     public void onUpdateMsg(Messages.UpdateMsg msg) {
         // Handle UpdateMsg
-        this.timeoutSchedule.remove(TimeoutType.UPDATE).cancel(); // canceling the Update timeout of the replica
+        if(this.getSelf().equals(this.getSender()))
+            this.timeoutSchedule.remove(TimeoutType.UPDATE).cancel(); // canceling the Update timeout of the replica
         this.localHistory.add(msg.snap); // add the unstable message to the replicas localHistory
         if(DEBUG){
             System.out.println("onUpdateMsg: ** " + getSelf().path().name() + " ** received update message from ** " + getSender().path().name()+" **");
@@ -396,7 +398,8 @@ public class Replica extends AbstractActor {
     }
 
     public void onElectionAckMsg(Messages.ElectionAckMsg msg){
-        this.timeoutSchedule.remove(TimeoutType.ELECTION_ACK).cancel();
+        if(this.timeoutSchedule.containsKey(TimeoutType.ELECTION_ACK))
+            this.timeoutSchedule.remove(TimeoutType.ELECTION_ACK).cancel();
         this.cachedMsg = null;
         if(DEBUG){
             System.out.println("Replica " + getSelf().path().name() + " received ElectionACKMsg from " + getSender().path().name() + ", so it has canceled the ElectionACK timout");
@@ -408,24 +411,28 @@ public class Replica extends AbstractActor {
     public void onElectionMsg(Messages.ElectionMsg msg){
 
         if(!this.isInElectionBehavior){
-            this.timeoutSchedule.remove(TimeoutType.RECEIVE_HEARTBEAT).cancel();
+            this.isInElectionBehavior = true;
+            this.getContext().become(replicaDuringElectionBehavior());
+            if(this.timeoutSchedule.containsKey(TimeoutType.RECEIVE_HEARTBEAT))
+                this.timeoutSchedule.remove(TimeoutType.RECEIVE_HEARTBEAT).cancel();
+            Snapshot lastSnapshot = !this.localHistory.isEmpty() ? this.localHistory.get(this.localHistory.size()-1) : Snapshot.defaultSnapshot();
             //if the first time you receive the election message, then put your data inside and forward.
             //Moreover, check if you are a candidate coordinator and if yes, update these data in the message and in yourself
             if(DEBUG)
                 System.out.println(getSelf().path().name() + " received the ElectionMsg for the first time from " + getSender().path().name() + " and it's entering into election behavior");
 
             Map<Integer, Messages.ElectionMsg.ActorData> data = new HashMap<Integer, Messages.ElectionMsg.ActorData>(msg.actorDatas);
-            data.put(this.replicaId, new Messages.ElectionMsg.ActorData(this.getSelf(), this.localHistory.get(this.localHistory.size()-1)));
+            data.put(this.replicaId, new Messages.ElectionMsg.ActorData(this.getSelf(), lastSnapshot));
 
-            int compare = this.localHistory.get(this.localHistory.size()-1).getTimeId().compareTo(msg.lastKnownUpdate.getTimeId());
+            int compare = lastSnapshot.getTimeId().compareTo(msg.lastKnownUpdate.getTimeId());
             if((compare > 0) || ((compare == 0) && (this.replicaId > msg.candidateCoordinatorID))){
                 if(DEBUG){
-                    System.out.println(getSelf().path().name() + " is finding out from the token (sent by "+this.getSender().path().name() +") that it is currently the best candidate, with the snapshot: " + this.localHistory.get(this.localHistory.size()-1).toString() +
+                    System.out.println(getSelf().path().name() + " is finding out from the token (sent by "+this.getSender().path().name() +") that it is currently the best candidate, with the snapshot: " + lastSnapshot.toString() +
                             " so it is updating itself and the token");
                     System.out.flush();
                 }
 
-                this.lastKnownUpdate = this.localHistory.get(this.localHistory.size()-1);
+                this.lastKnownUpdate = lastSnapshot;
                 this.candidateCoordinatorID = this.replicaId;
             }
 
@@ -440,7 +447,6 @@ public class Replica extends AbstractActor {
                 this.lastKnownUpdate = msg.lastKnownUpdate;
                 this.candidateCoordinatorID = msg.candidateCoordinatorID;
             }
-            this.getContext().become(replicaDuringElectionBehavior());
             Messages.ElectionMsg token = new Messages.ElectionMsg(this.candidateCoordinatorID, this.lastKnownUpdate, data);
             this.forwardSuccessor(token);
 
@@ -524,7 +530,8 @@ public class Replica extends AbstractActor {
 
 
     private void forwardSuccessor(Messages.ElectionMsg token){
-        this.successor.tell(token, this.getSelf());
+        this.cachedMsg = token;
+        this.successor.tell(this.cachedMsg, this.getSelf());
         this.setTimeout(TimeoutType.ELECTION_ACK);
         this.getSender().tell(new Messages.ElectionAckMsg(), this.getSelf());
 
@@ -544,7 +551,7 @@ public class Replica extends AbstractActor {
                     "The message contains the updates: ");
             for(Snapshot snap : msg.sync)
                 System.out.print(snap.toString() + ", ");
-            System.out.println(". The last update of this replica was: " + this.localHistory.get(this.localHistory.size()-1));
+            System.out.println("The last update of the replica" + this.replicaId + "was: " + (!this.localHistory.isEmpty() ? this.localHistory.get(this.localHistory.size()-1) : Snapshot.defaultSnapshot()));
             System.out.flush();
         }
 
@@ -553,8 +560,8 @@ public class Replica extends AbstractActor {
         this.localHistory.addAll(msg.sync);
         this.getContext().unbecome(); //return to normal behavior
 
-        this.timeoutSchedule.remove(TimeoutType.ELECTION_PROTOCOL).cancel();
-        this.timeoutSchedule.remove(TimeoutType.ELECTION_ACK).cancel();
+        if(this.timeoutSchedule.containsKey(TimeoutType.ELECTION_PROTOCOL)) this.timeoutSchedule.remove(TimeoutType.ELECTION_PROTOCOL).cancel();
+        if(this.timeoutSchedule.containsKey(TimeoutType.ELECTION_ACK)) this.timeoutSchedule.remove(TimeoutType.ELECTION_ACK).cancel();
 
         setTimeout(TimeoutType.RECEIVE_HEARTBEAT);
     }

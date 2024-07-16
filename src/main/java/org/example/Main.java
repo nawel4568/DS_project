@@ -24,10 +24,7 @@ public class Main {
 
         Utils.clearFileContent("output.txt");
 
-
-
         final ActorSystem system = ActorSystem.create("DistributedSystem");
-
 
         // Create the Group of Replicas
         List<ActorRef> group = new ArrayList<ActorRef>();
@@ -59,12 +56,12 @@ public class Main {
             System.out.println("---- Entering sleep block...");
             System.out.flush();
         }
-        //inputContinue();
-        try {
-            Thread.sleep((2000));
+        inputContinue();
+        /*try {
+            Thread.sleep((1000));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
-        }
+        } */
         if(DEBUG){
             System.out.println("------after the enter------");
             System.out.flush();
