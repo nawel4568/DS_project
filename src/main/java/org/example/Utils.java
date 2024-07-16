@@ -4,6 +4,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 
 public class Utils {
+    public static final boolean DEBUG = true;
 
     public static void clearFileContent(String fileName) {
         try (FileWriter fw = new FileWriter(fileName, false)) {

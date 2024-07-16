@@ -2,20 +2,19 @@ package org.example;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
-import akka.actor.Props;
 
-import java.io.FileWriter;
-import java.io.Serializable;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.io.IOException;
 import java.util.Random;
 
+import static org.example.Utils.DEBUG;
+
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
-    final static int N_REPLICAS = 3;
+    final static int N_REPLICAS = 6;
     Random rand = new Random();
 
 
@@ -39,8 +38,10 @@ public class Main {
         // Send the Start message to all the Replicas
         Messages.StartMessage start = new Messages.StartMessage(group);
         //group.get(0).tell(start, ActorRef.noSender());
-        System.out.println("Entering the loop for sending the start messages...");
-        System.out.flush();
+        if(DEBUG){
+            System.out.println("Entering the loop for sending the start messages...");
+            System.out.flush();
+        }
 
         for (ActorRef peer: group) {
             peer.tell(start, ActorRef.noSender());
@@ -51,29 +52,37 @@ public class Main {
             }
 
         }
-        inputContinue();
-        System.out.println("Entering sleep block...");
-        System.out.flush();
-        inputContinue();
+
+        if(DEBUG){
+            System.out.println("---- Entering sleep block...");
+            System.out.flush();
+        }
+        //inputContinue();
         try {
-            Thread.sleep((10000));
+            Thread.sleep((2000));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        System.out.println("------after the enter------");
-        System.out.flush();
+        if(DEBUG){
+            System.out.println("------after the enter------");
+            System.out.flush();
+        }
         //Arbitrarily pick a replica for initializing the value
         group.get(1).tell(new Messages.WriteReqMsg(-1), ActorRef.noSender()); // **** Write
-        System.out.println("Just sended the message of the sleep block...");
-                System.out.flush();
+        if(DEBUG){
+            System.out.println("Just sended the message of the sleep block...");
+            System.out.flush();
+        }
 
         try {
             Thread.sleep(50);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        System.out.println("I am out of the sleep sleep block");
-                System.out.flush();
+        if(DEBUG){
+            System.out.println("I am out of the sleep sleep block");
+            System.out.flush();
+        }
 
         //inputContinue();
 
@@ -84,10 +93,10 @@ public class Main {
         ActorRef client3 = system.actorOf(Client.props(3),"Client3");
 
 
-        /** problem is Coordinator == null **/
-        group.get(3).tell(new Messages.WriteReqMsg(5), client1); // **** Write
+
+        group.get(2).tell(new Messages.WriteReqMsg(5), client1); // **** Write
         try {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -95,38 +104,43 @@ public class Main {
 
         group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
         try {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+        //inputContinue();
 
         group.get(3).tell(new Messages.WriteReqMsg(4), client1); // **** Write`
         try {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+        //inputContinue();
 
         group.get(3).tell(new Messages.WriteReqMsg(9), client1); // **** Write
         try {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+        //inputContinue();
 
         group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
         try {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+        //inputContinue();
         group.get(3).tell(new Messages.ReadReqMsg(), client1);
 
         try {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+        inputContinue();
 
         /** group.get(2).tell(new Messages.WriteReqMsg(8), client3); // **** Write
         try {
