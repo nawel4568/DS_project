@@ -1,32 +1,14 @@
-Replica4 update 0 : 1 -1
-Replica3 update 0 : 1 -1
-Replica1 update 0 : 1 -1
 Replica2 update 0 : 1 -1
+Replica4 update 0 : 1 -1
+Replica1 update 0 : 1 -1
+Replica3 update 0 : 1 -1
 Replica0 update 0 : 1 -1
-Replica0 update 0 : 2 5
-Replica4 update 0 : 2 5
 Replica3 update 0 : 2 5
 Replica1 update 0 : 2 5
 Replica2 update 0 : 2 5
+Replica0 update 0 : 2 5
+Replica4 update 0 : 2 5
 Client1 read req to Replica3
 
 Client1 read done 5
-
-Replica0 update 0 : 3 4
-Replica1 update 0 : 3 4
-Replica3 update 0 : 3 4
-Replica4 update 0 : 3 4
-Replica2 update 0 : 3 4
-Replica1 update 0 : 4 9
-Replica0 update 0 : 4 9
-Replica3 update 0 : 4 9
-Replica2 update 0 : 4 9
-Replica4 update 0 : 4 9
-Client1 read req to Replica3
-
-Client1 read done 9
-
-Client1 read req to Replica3
-
-Client1 read done 9
 

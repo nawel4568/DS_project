@@ -52,35 +52,19 @@ public class Main {
 
         }
 
-        if(DEBUG){
-            System.out.println("---- Entering sleep block...");
-            System.out.flush();
-        }
         inputContinue();
         /*try {
             Thread.sleep((1000));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } */
-        if(DEBUG){
-            System.out.println("------after the enter------");
-            System.out.flush();
-        }
         //Arbitrarily pick a replica for initializing the value
         group.get(1).tell(new Messages.WriteReqMsg(-1), ActorRef.noSender()); // **** Write
-        if(DEBUG){
-            System.out.println("Just sended the message of the sleep block...");
-            System.out.flush();
-        }
 
         try {
-            Thread.sleep(50);
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
-        }
-        if(DEBUG){
-            System.out.println("I am out of the sleep sleep block");
-            System.out.flush();
         }
 
         //inputContinue();
@@ -95,7 +79,7 @@ public class Main {
 
         group.get(2).tell(new Messages.WriteReqMsg(5), client1); // **** Write
         try {
-            Thread.sleep(1000);
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -103,7 +87,7 @@ public class Main {
 
         group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
         try {
-            Thread.sleep(1000);
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -111,7 +95,7 @@ public class Main {
 
         group.get(3).tell(new Messages.WriteReqMsg(4), client1); // **** Write`
         try {
-            Thread.sleep(1000);
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -119,7 +103,7 @@ public class Main {
 
         group.get(3).tell(new Messages.WriteReqMsg(9), client1); // **** Write
         try {
-            Thread.sleep(1000);
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -127,7 +111,7 @@ public class Main {
 
         group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
         try {
-            Thread.sleep(1000);
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -135,7 +119,7 @@ public class Main {
         group.get(3).tell(new Messages.ReadReqMsg(), client1);
 
         try {
-            Thread.sleep(1000);
+            Thread.sleep(3000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
