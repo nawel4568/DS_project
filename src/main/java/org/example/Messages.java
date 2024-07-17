@@ -101,7 +101,9 @@ public abstract class Messages implements Serializable {
 
     public static class ElectionMsg extends Messages {
 
-        public static final class ActorData{ //class for exchanging data about the replicas
+
+        public static final class ActorData{
+            //class for exchanging data about the replicas
             public final ActorRef replicaRef;
             public final Snapshot lastUpdate;
 
@@ -123,6 +125,18 @@ public abstract class Messages implements Serializable {
         }
 
 
+    }
+
+    public static class ElectionMsgNAWAL extends Messages {
+        public final int replicaId;
+        public final Snapshot lastUpdate;
+        public final Map<Integer,Snapshot> updateList;
+
+        public ElectionMsgNAWAL(int replicaId, Snapshot lastUpdate, Map<Integer, Snapshot> updateList) {
+            this.replicaId = replicaId;
+            this.lastUpdate = lastUpdate;
+            this.updateList = new HashMap<>();
+        }
     }
 
     public static class ElectionAckMsg extends Messages {

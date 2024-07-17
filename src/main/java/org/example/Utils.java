@@ -6,6 +6,9 @@ import java.io.IOException;
 public class Utils {
     public static final boolean DEBUG = true;
 
+    public static final boolean NAWAL = true;
+    public static final boolean TALPA = !NAWAL;
+
     public static void clearFileContent(String fileName) {
         try (FileWriter fw = new FileWriter(fileName, false)) {
             // Creating FileWriter in non-append mode clears the file content
