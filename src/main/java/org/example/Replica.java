@@ -49,7 +49,7 @@ public class Replica extends AbstractActor {
 
 
     public enum TimeoutType{
-        UPDATE(800),
+        UPDATE(700),
         WRITEOK(1000),
         ELECTION_ACK(900),
         ELECTION_PROTOCOL(5000),
@@ -82,8 +82,8 @@ public class Replica extends AbstractActor {
         this.lastKnownUpdate = Snapshot.defaultSnapshot();
     }
 
-    void delay(int d) {
-        try {Thread.sleep(d);} catch (Exception ignored) {}
+    void delay() {
+        try {Thread.sleep(rand.nextInt(50));} catch (Exception ignored) {}
     }
 
 
@@ -263,6 +263,7 @@ public class Replica extends AbstractActor {
                 actorData.put(this.replicaId, new Messages.ElectionMsg.ActorData(getSelf(), this.lastKnownUpdate));
 
                 this.cachedMsg = new Messages.ElectionMsg(this.candidateCoordinatorID, this.lastKnownUpdate, actorData);
+                delay();
                 this.successor.tell(cachedMsg, this.getSelf()); //send election message to your successor
                 this.setTimeout(TimeoutType.ELECTION_ACK);
 
@@ -287,7 +288,7 @@ public class Replica extends AbstractActor {
                         System.out.println(getSelf().path().name() + " has timed out for election ack of the old successor " + oldSuccessor.path().name() + " and is changing the successor to the new one: " + this.successor.path().name());
                         System.out.flush();
                     }
-
+                    delay();
                     this.successor.tell(this.cachedMsg, this.getSelf());
                     this.setTimeout(TimeoutType.ELECTION_ACK);
                 }
@@ -303,6 +304,7 @@ public class Replica extends AbstractActor {
         for(i=this.localHistory.size()-1; i>=0 && !this.localHistory.get(i).isStable(); i--);
         if(i < 0) i = 0;
 
+        delay();
         if(!localHistory.isEmpty())
             this.getSender().tell(this.localHistory.get(i).getV(), this.getSelf());
         else{
@@ -326,15 +328,15 @@ public class Replica extends AbstractActor {
             for (ActorRef replica: this.groupOfReplicas){// Broadcast the Update message to all the Replicas
 
                 if(!replica.equals(this.coordinator)){
-                    int x = rand.nextInt(300);
-                    delay(x);
+                    //int x = rand.nextInt(300);
+                    delay();
                     if(DEBUG){
                         System.out.println("onWriteReqMsg: Coordinator ** " + this.getSelf().path().name() + " ** is sending the update msg with the value: "+req.getV()+" to replica ** " + replica.path().name()+" **");
                         System.out.flush();
                     }
-                    a++;
-                    if(a == 13){
-                        crash(); break;}
+                    //a++;
+                    //if(a == 13){
+                    //    crash(); break;}
                     replica.tell(updateMsg, this.getSender());
                 }
             }
@@ -344,6 +346,7 @@ public class Replica extends AbstractActor {
                 System.out.println("onWriteReqMsg: The ** " + this.getSelf().path().name() + " ** is not the coordinator so it forward the message to the Coordinator ** " + ((this.coordinator != null) ? this.coordinator.path().name() : "NULL") +" **");
                 System.out.flush();
             }
+            delay();
             setTimeout(TimeoutType.UPDATE);
             this.coordinator.tell(req, this.getSelf());
 
@@ -361,6 +364,7 @@ public class Replica extends AbstractActor {
             System.out.flush();
         }
         Messages.UpdateAckMsg updateAckMsg = new Messages.UpdateAckMsg(msg.snap.getTimeId());
+        delay();
         setTimeout(TimeoutType.WRITEOK);
         this.coordinator.tell(updateAckMsg, this.getSelf()); //send the Ack of this specific message with associating the timeId of the message
     }
@@ -392,8 +396,10 @@ public class Replica extends AbstractActor {
                     this.localHistory.get(msg.updateID.seqNum-1).setStable(true);
                     Messages.WriteOKMsg writeOk= new Messages.WriteOKMsg(msg.updateID);
                     for (ActorRef replica: this.groupOfReplicas){
-                        if(!this.getSelf().equals(replica))
+                        if(!this.getSelf().equals(replica)) {
+                            delay();
                             replica.tell(writeOk, this.getSelf());
+                        }
                     }
                     this.quorum.remove(msg.updateID);
                 }
@@ -436,14 +442,18 @@ public class Replica extends AbstractActor {
         if(!this.isInElectionBehavior){
             this.isInElectionBehavior = true;
             this.getContext().become(replicaDuringElectionBehavior());
-            if(this.timeoutSchedule.containsKey(TimeoutType.RECEIVE_HEARTBEAT))
-                this.timeoutSchedule.remove(TimeoutType.RECEIVE_HEARTBEAT).cancel();
+            //if(this.timeoutSchedule.containsKey(TimeoutType.RECEIVE_HEARTBEAT))
+            //    this.timeoutSchedule.remove(TimeoutType.RECEIVE_HEARTBEAT).cancel();
+            for(Map.Entry<TimeoutType, Cancellable> entry : this.timeoutSchedule.entrySet())
+                entry.getValue().cancel();
+            this.timeoutSchedule.clear();
+
             Snapshot lastSnapshot = !this.localHistory.isEmpty() ? this.localHistory.get(this.localHistory.size()-1) : Snapshot.defaultSnapshot();
             //if the first time you receive the election message, then put your data inside and forward.
             //Moreover, check if you are a candidate coordinator and if yes, update these data in the message and in yourself
-            if(DEBUG)
+            if(DEBUG) {
                 System.out.println(getSelf().path().name() + " received the ElectionMsg for the first time from " + getSender().path().name() + " and it's entering into election behavior");
-
+            }
             Map<Integer, Messages.ElectionMsg.ActorData> data = new HashMap<Integer, Messages.ElectionMsg.ActorData>(msg.actorDatas);
             data.put(this.replicaId, new Messages.ElectionMsg.ActorData(this.getSelf(), lastSnapshot));
 
@@ -471,14 +481,16 @@ public class Replica extends AbstractActor {
                 this.candidateCoordinatorID = msg.candidateCoordinatorID;
             }
             Messages.ElectionMsg token = new Messages.ElectionMsg(this.candidateCoordinatorID, this.lastKnownUpdate, data);
+            delay();
             this.forwardSuccessor(token);
+            delay();
             this.getSender().tell(new Messages.ElectionAckMsg(), this.getSelf());
 
         }
         else{
-            if(DEBUG)
+            if(DEBUG) {
                 System.out.println(getSelf().path().name() + " received another ElectionMsg from " + getSender().path().name());
-
+            }
             //if it's not the first time you receive an election message, then:
             //   -- The token is passing for the second time and it has the true coordinator: your candidate has to be updated and you have to forward (put your data inside also, if you are not in the token)
             //   --  The  token has a candidate less updated then yours: is an election started after the election you already received, drop the message
@@ -486,13 +498,14 @@ public class Replica extends AbstractActor {
             //   -- The candidate leader is you: you are the new coordinator
 
             int compare = this.lastKnownUpdate.getTimeId().compareTo(msg.lastKnownUpdate.getTimeId());
-            if(compare < 0){
+            if((compare < 0) || ( (compare == 0) && this.replicaId < msg.candidateCoordinatorID)  ){
                 if(DEBUG) {
                         System.out.println(getSelf().path().name() + " finds out that the ElectionMsg from " + getSender().path().name() +
                                 " brings a more updated candidate (or equally updated but with higher ID)that the current one in this replica (" + this.lastKnownUpdate.toString() + ") from the local candidate Replica" + this.candidateCoordinatorID +"." +
                                 "The last known update in the token is instead: " + msg.lastKnownUpdate.toString() + " from the candidate " + msg.candidateCoordinatorID);
                 }
                 //if the message is bringing one update that is more recent then the one that I know to be the last one (so it is bringing a more updated leader then the one I have as candidate)
+                // of, if comp==0, brings the same update
                 this.lastKnownUpdate = msg.lastKnownUpdate;
                 this.candidateCoordinatorID = msg.candidateCoordinatorID;
 
@@ -501,13 +514,14 @@ public class Replica extends AbstractActor {
                     data.put(this.replicaId, new Messages.ElectionMsg.ActorData(this.getSelf(), !this.localHistory.isEmpty() ? this.localHistory.get(this.localHistory.size()-1) : Snapshot.defaultSnapshot()));
 
                 Messages.ElectionMsg token = new Messages.ElectionMsg(msg.candidateCoordinatorID, msg.lastKnownUpdate, data);
-                int x = rand.nextInt(200);
-                delay(x);
+                //int x = rand.nextInt(200);
+                delay();
                 this.forwardSuccessor(token);
+                delay();
                 this.getSender().tell(new Messages.ElectionAckMsg(), this.getSelf());
 
             }
-            else if(this.replicaId == msg.candidateCoordinatorID){ //if you are the coordinator
+            else if(this.replicaId == msg.candidateCoordinatorID && this.lastKnownUpdate == msg.lastKnownUpdate){ //if you are the coordinator
                 if(DEBUG) {
                     System.out.println(getSelf().path().name() + " finds out that the ElectionMsg from " + getSender().path().name() +
                             " brings itself as candidate with the last known update as: " + msg.lastKnownUpdate.toString() +". The last known update of this replica is in fact: " + this.lastKnownUpdate.toString() +
@@ -515,11 +529,13 @@ public class Replica extends AbstractActor {
                     );
                     System.out.flush();
                 }
+                delay();
                 this.getSender().tell(new Messages.ElectionAckMsg(), this.getSelf());
                 this.becomeCoordinatorAndUpdateReplicas(new TreeMap<Integer, Messages.ElectionMsg.ActorData>(msg.actorDatas));
 
             }
             else { //else drop message
+                delay();
                 this.getSender().tell(new Messages.ElectionAckMsg(), this.getSelf());
                 if(DEBUG) {
                     System.out.println(getSelf().path().name() + " finds out that the ElectionMsg from " + getSender().path().name() +
@@ -553,6 +569,7 @@ public class Replica extends AbstractActor {
             this.timeStamp = new TimeId(this.timeStamp.epoch+1, 0);
             //send update
             Messages.SyncMsg syncMsg = new Messages.SyncMsg(partialHistory);
+            delay();
             currentReplica.tell(syncMsg, this.getSelf());
         }
 

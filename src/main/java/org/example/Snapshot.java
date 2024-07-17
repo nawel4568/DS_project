@@ -8,7 +8,7 @@ public class Snapshot {
     private boolean stable;
 
     public static Snapshot defaultSnapshot(){
-        return new Snapshot(new TimeId(Integer.MIN_VALUE,Integer.MIN_VALUE), null, true);
+        return new Snapshot(new TimeId(Integer.MIN_VALUE,Integer.MIN_VALUE), Integer.MIN_VALUE, true);
     }
 
     public Snapshot(TimeId timeId, Integer v, boolean stable) {
