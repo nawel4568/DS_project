@@ -6,6 +6,8 @@ import java.io.Serializable;
 import java.util.*;
 
 public abstract class Messages implements Serializable {
+
+    public static class PrintHistoryMsg extends Messages{}
     
     public static class StartMessage extends Messages{
         public final List<ActorRef> group;

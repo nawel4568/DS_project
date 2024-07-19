@@ -16,7 +16,7 @@ import static org.example.Utils.DEBUG;
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
-    final static int N_REPLICAS = 6;
+    final static int N_REPLICAS = 4;
     Random rand = new Random();
 
 
@@ -49,8 +49,16 @@ public class Main {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-
         }
+        for (ActorRef peer: group) {
+            peer.tell(new Messages.PrintHistoryMsg(), ActorRef.noSender());
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
 
         inputContinue();
         /*try {
@@ -66,8 +74,10 @@ public class Main {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+        for (ActorRef peer: group)
+            peer.tell(new Messages.PrintHistoryMsg(), ActorRef.noSender());
 
-        //inputContinue();
+        inputContinue();
 
 
         // Create the Clients
@@ -79,43 +89,92 @@ public class Main {
 
         group.get(2).tell(new Messages.WriteReqMsg(5), client1); // **** Write
         try {
-            Thread.sleep(2000);
+            Thread.sleep(2500);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        //inputContinue();
+
+        for (ActorRef peer: group) {
+            peer.tell(new Messages.PrintHistoryMsg(), ActorRef.noSender());
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        inputContinue();
 
         group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
         try {
-            Thread.sleep(2000);
+            Thread.sleep(2500);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        //inputContinue();
+
+        for (ActorRef peer: group) {
+            peer.tell(new Messages.PrintHistoryMsg(), ActorRef.noSender());
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        inputContinue();
 
         group.get(3).tell(new Messages.WriteReqMsg(4), client1); // **** Write`
         try {
-            Thread.sleep(2000);
+            Thread.sleep(2500);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        //inputContinue();
+
+        for (ActorRef peer: group) {
+            peer.tell(new Messages.PrintHistoryMsg(), ActorRef.noSender());
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        inputContinue();
 
         group.get(3).tell(new Messages.WriteReqMsg(9), client1); // **** Write
         try {
-            Thread.sleep(2000);
+            Thread.sleep(2500);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        //inputContinue();
+
+        for (ActorRef peer: group) {
+            peer.tell(new Messages.PrintHistoryMsg(), ActorRef.noSender());
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        inputContinue();
 
         group.get(3).tell(new Messages.ReadReqMsg(), client1); // **** Read
         try {
-            Thread.sleep(2000);
+            Thread.sleep(2500);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        //inputContinue();
+
+        for (ActorRef peer: group) {
+            peer.tell(new Messages.PrintHistoryMsg(), ActorRef.noSender());
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        inputContinue();
         group.get(3).tell(new Messages.ReadReqMsg(), client1);
 
         try {
@@ -123,6 +182,16 @@ public class Main {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+
+        for (ActorRef peer: group) {
+            peer.tell(new Messages.PrintHistoryMsg(), ActorRef.noSender());
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         inputContinue();
 
         /** group.get(2).tell(new Messages.WriteReqMsg(8), client3); // **** Write

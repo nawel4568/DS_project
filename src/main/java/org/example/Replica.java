@@ -148,6 +148,8 @@ public class Replica extends AbstractActor {
 
                 .match(Messages.HeartbeatMsg.class, this::onHeartbeatMsg)
                 .match(Messages.TimeoutMsg.class, this::onTimeoutMsg)
+                .match(Messages.PrintHistoryMsg.class, this::onPrintHistoryMsg)
+
 
                 .matchAny(msg -> {})
 
@@ -166,6 +168,8 @@ public class Replica extends AbstractActor {
                 .match(Messages.SyncMsg.class, this::onSyncMsg)
 
                 .match(Messages.TimeoutMsg.class, this::onTimeoutMsg)
+                .match(Messages.PrintHistoryMsg.class, this::onPrintHistoryMsg)
+
                 .matchAny(msg -> {})
 
                 .build();
@@ -185,7 +189,7 @@ public class Replica extends AbstractActor {
 
                 .match(Messages.HeartbeatMsg.class, this::onHeartbeatMsg)
                 .match(Messages.TimeoutMsg.class, this::onTimeoutMsg)
-
+                .match(Messages.PrintHistoryMsg.class, this::onPrintHistoryMsg)
                 .matchAny(msg -> {})
 
                 .build();
@@ -209,6 +213,15 @@ public class Replica extends AbstractActor {
 
     private void setCoordinator(ActorRef coordinator){
         this.coordinator = coordinator;
+    }
+
+    public void onPrintHistoryMsg(Messages.PrintHistoryMsg msg){
+        System.out.println();
+        System.out.print("The local History of the " + this.getSelf().path().name() + " is-> ");
+        for(Snapshot snap : this.localHistory)
+            System.out.print(snap.toString() + " : ");
+        System.out.println();
+        System.out.flush();
     }
 
 
@@ -251,12 +264,13 @@ public class Replica extends AbstractActor {
     }
 
     public void onTimeoutMsg(Messages.TimeoutMsg msg){
-        if(DEBUG)
-            System.out.println(this.clock++ + " : " + this.replicaId + " " +" " +this.getSelf().path().name() + " receives ----- onTimeoutMsg ----- of type " + msg.type.name());
 
         Map<Integer, Messages.ElectionMsg.ActorData> actorData;
         switch (msg.type){
             case WRITEOK, RECEIVE_HEARTBEAT, UPDATE, ELECTION_PROTOCOL:
+                if(DEBUG)
+                    System.out.println(this.clock++ + " : " + this.replicaId + " " +" " +this.getSelf().path().name() + " receives ----- onTimeoutMsg ----- of type " + msg.type.name());
+
                 //coordinator crashed
                 for(Map.Entry<TimeoutType, Cancellable> entry : this.timeoutSchedule.entrySet())
                     entry.getValue().cancel();
@@ -286,6 +300,9 @@ public class Replica extends AbstractActor {
 
             case ELECTION_ACK:
                 if(isInElectionBehavior) {
+                    if(DEBUG)
+                        System.out.println(this.clock++ + " : " + this.replicaId + " " +" " +this.getSelf().path().name() + " receives ----- onTimeoutMsg ----- of type " + msg.type.name());
+
                     //set the new successor and send the cached message
                     ActorRef oldSuccessor = this.successor;
                     this.successor = this.groupOfReplicas.get((this.groupOfReplicas.indexOf(oldSuccessor) + 1) % this.groupOfReplicas.size());
@@ -341,7 +358,7 @@ public class Replica extends AbstractActor {
                         System.out.flush();
                     }
                     b++;
-                    if(b == 13){
+                    if(b == 9){
                         crash(); break;}
                     replica.tell(updateMsg, this.getSender());
                 }
