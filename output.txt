@@ -1,6 +1,6 @@
 Replica0 update 1 : 1 -1
-Replica2 update 1 : 1 -1
 Replica1 update 1 : 1 -1
+Replica2 update 1 : 1 -1
 Replica0 update 1 : 2 5
 Replica1 update 1 : 2 5
 Replica2 update 1 : 2 5
