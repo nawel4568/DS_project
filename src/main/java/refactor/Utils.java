@@ -2,16 +2,9 @@ package refactor;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Random;
 
 public class Utils {
     public static final boolean DEBUG = true;
-
-    private static final Random rand = new Random();
-
-    public static void delay() {
-        try {Thread.sleep(rand.nextInt(50));} catch (Exception ignored) {}
-    }
 
     public static void clearFileContent(String fileName) {
         try (FileWriter fw = new FileWriter(fileName, false)) {

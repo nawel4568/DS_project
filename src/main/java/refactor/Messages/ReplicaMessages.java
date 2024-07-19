@@ -8,12 +8,11 @@ import java.util.*;
 
 public abstract class ReplicaMessages implements Serializable {
 
-    public static class StartReplicaMsg extends ReplicaMessages {
-        private final List<ActorRef> group;
-        public StartReplicaMsg(List<ActorRef> group) {
+    public static class StartMsg extends ReplicaMessages {
+        public final List<ActorRef> group;
+        public StartMsg(List<ActorRef> group) {
             this.group = Collections.unmodifiableList(new ArrayList<>(group));
         }
-        public List<ActorRef> getGroup() { return group; }
     }
 
 
@@ -25,7 +24,40 @@ public abstract class ReplicaMessages implements Serializable {
     }
 
 
-    public static class ElectionMsg extends ReplicaMessages {}
+    public static class ElectionMsg extends ReplicaMessages {
+        //This class is a pair replcaID-Update and define an order
+        // of these object based on the timestamp. The Sorted set used to store objects of this class
+        //keeps as last element the highest element, which is, accordingly to the custom Comparator,
+        //the most updated replica: this way, the last element of the sorted set is always the candidate coordinator.
+        public static class ReplicaUpdate implements Comparable<ReplicaUpdate>{
+            public final int replicaID;
+            public final Timestamp lastUpdate;
+            public final Timestamp lastStable;
+
+            public ReplicaUpdate(int replicaID, Timestamp lastUpdate, Timestamp lastStable){
+                this.replicaID = replicaID;
+                this.lastUpdate = lastUpdate;
+                this.lastStable = lastStable;
+            }
+            @Override
+            public int compareTo(ReplicaUpdate other){
+                return this.lastUpdate.compareTo(other.lastUpdate);
+            }
+            @Override
+            public String toString(){
+                return "ReplicaUpdate{" +
+                        "replicaID=" + replicaID +
+                        ", lastUpdate=" + lastUpdate +
+                        '}';
+            }
+        }
+
+        public final SortedSet<ReplicaUpdate> replicaUpdates;
+
+        public ElectionMsg(SortedSet<ReplicaUpdate> ReplicaUpdates){
+            this.replicaUpdates = new TreeSet<ReplicaUpdate>(ReplicaUpdates);
+        }
+    }
     /*public static class ElectionMsg extends ReplicaMessages {
 
         public static final class ActorData{ //class for exchanging data about the replicas

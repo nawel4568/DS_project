@@ -3,16 +3,14 @@ package refactor.Messages;
 import java.util.Objects;
 
 public class Data {
-    public final Timestamp timestamp;
     public final Integer value;
     private boolean stable;
 
     public static Data defaultData(){
-        return new Data(Timestamp.defaultTimestamp(), null, true);
+        return new Data(null, true);
     }
 
-    public Data(Timestamp timestamp, Integer value, boolean stable) {
-        this.timestamp = timestamp;
+    public Data(Integer value, boolean stable) {
         this.value = value;
         this.stable = stable;
     }
@@ -24,7 +22,7 @@ public class Data {
 
     @Override
     public int hashCode() {
-        return Objects.hash(timestamp, value);
+        return Objects.hash(value, stable);
     }
 
     @Override
@@ -39,8 +37,7 @@ public class Data {
     @Override
     public String toString() {
         return "Data{" +
-                "timestamp=" + timestamp +
-                ", value=" + value +
+                "value=" + value +
                 ", stable=" + stable +
                 '}';
     }
