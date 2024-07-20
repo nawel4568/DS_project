@@ -1,39 +1,58 @@
 package refactor;
 
 import akka.actor.AbstractActor;
+import akka.actor.ActorRef;
 import akka.actor.Props;
+import refactor.Messages.ClientMessages;
+import refactor.Messages.ReplicaMessages;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class Client extends AbstractActor {
-    private final static int READ_REQ = 500;
     private final int clientId;
-    Utils.FileAdd file = new Utils.FileAdd("output.txt");
+    private int lastRead;
+    private final List<ActorRef> replicas;
 
+    public static Props props(int clientId) {
+        return Props.create(Client.class, () -> new Client(clientId));
+    }
 
     public Client(int clientId) {
         this.clientId = clientId;
+        this.replicas = new ArrayList<ActorRef>();
     }
 
     @Override
     public Receive createReceive() {
         return receiveBuilder()
-                .match(Integer.class, this::onReceiveValue).build();
+                .match(ReplicaMessages.StartMsg.class, this::onStartMsg)
+                .match(Integer.class, this::onReceiveValue)
+                .match(ClientMessages.TriggerReadOperation.class,  this::onTriggerReadOperation)
+                .match(ClientMessages.TriggerWriteOperation.class, this::onTriggerWriteOperation)
+                .build();
     }
 
+    private void onStartMsg(ReplicaMessages.StartMsg msg){
+        this.replicas.addAll(msg.group);
+    }
 
+    private void onTriggerReadOperation(ClientMessages.TriggerReadOperation trigger){
+        if(trigger.targetReplica >= 0 && trigger.targetReplica < this.replicas.size())
+            this.replicas.get(trigger.targetReplica).tell(new ClientMessages.ReadReqMsg(), this.getSelf());
+    }
 
+    private void onTriggerWriteOperation(ClientMessages.TriggerWriteOperation trigger){
+        if(trigger.targetReplica >= 0 && trigger.targetReplica < this.replicas.size())
+            this.replicas.get(trigger.targetReplica).tell(new ClientMessages.WriteReqMsg(trigger.value), this.getSelf());
 
+    }
 
     private void onReceiveValue(Integer val){
-
         System.out.println("\nClient "+getSelf().path().name() + " received value " + val+ " from "+getSender().path().name()+"\n");
         System.out.flush();
-        file.appendToFile("\n"+getSelf().path().name()+" read done "+val+"\n");
-        System.out.println(getSelf().path().name()+" read done "+val);
     }
 
-    public static Props props(int clientId) {
-        return Props.create(Client.class, () -> new Client(clientId));
-    }
 
 
 }

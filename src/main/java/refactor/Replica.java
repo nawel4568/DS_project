@@ -501,7 +501,7 @@ public class Replica extends AbstractActor {
     public void onCoordinatorWriteReqMsg(ClientMessages.WriteReqMsg msg){
         //put the new value in the local history (as unstable) and send the update to the replicas
         this.lastUpdate.incrementSeqNum();
-        Data newData = new Data(msg.getV(), false);
+        Data newData = new Data(msg.getValue(), false);
         this.localHistory.put(this.lastUpdate, newData);
         this.quorum.put(this.lastUpdate, 1); //add yourself to the quorum for this update
         for(ActorRef replica : this.groupOfReplicas)
