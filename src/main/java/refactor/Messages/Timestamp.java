@@ -17,8 +17,8 @@ public class Timestamp implements Comparable<Timestamp> {
 
     public int getEpoch(){return this.epoch;}
     public int getSeqNum(){return this.seqNum;}
-    public void incrementEpoch(int epoch){this.epoch=this.epoch+1;}
-    public void incrementSeqNum(int seqNum){this.seqNum=this.seqNum+1;}
+    public void incrementEpoch(){this.epoch=this.epoch+1;}
+    public void incrementSeqNum(){this.seqNum=this.seqNum+1;}
 
     @Override
     public boolean equals(Object obj){

@@ -31,7 +31,7 @@ public class Data {
         if (obj == null || getClass() != obj.getClass()) return false;
 
         Data other = (Data) obj;
-        return Objects.equals(this.value, other.value) && this.stable == other.stable && Objects.equals(this.timestamp, other.timestamp);
+        return Objects.equals(this.value, other.value) && this.stable == other.stable;
     }
 
     @Override
