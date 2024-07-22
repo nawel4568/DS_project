@@ -63,9 +63,12 @@ public class Main {
         sleep(1000);
         inputContinue();
         client1.tell(new ClientMessages.TriggerWriteOperation(0,7), ActorRef.noSender());
-        client1.tell(new ClientMessages.TriggerWriteOperation(0,7), ActorRef.noSender());
-
         sleep(3000);
+        inputContinue();
+
+        client1.tell(new ClientMessages.TriggerWriteOperation(4,9), ActorRef.noSender());
+
+        sleep(1000);
         inputContinue();
         client1.tell(new ClientMessages.TriggerReadOperation(4),ActorRef.noSender());
         sleep(1000);
