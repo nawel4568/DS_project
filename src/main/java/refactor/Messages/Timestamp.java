@@ -14,11 +14,19 @@ public class Timestamp implements Comparable<Timestamp> {
         this.epoch = aEpoch;
         this.seqNum = aSeqNum;
     }
+    public Timestamp(Timestamp other){
+        this.epoch = other.epoch;
+        this.seqNum = other.seqNum;
+    }
 
     public int getEpoch(){return this.epoch;}
     public int getSeqNum(){return this.seqNum;}
-    public void incrementEpoch(){this.epoch=this.epoch+1;}
-    public void incrementSeqNum(){this.seqNum=this.seqNum+1;}
+    public Timestamp incrementEpoch(){
+        return new Timestamp(this.epoch+1, 0);
+    }
+    public Timestamp incrementSeqNum(){
+        return new Timestamp(this.epoch, this.seqNum+1);
+    }
 
     @Override
     public boolean equals(Object obj){

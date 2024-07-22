@@ -7,12 +7,16 @@ public class Data {
     private boolean stable;
 
     public static Data defaultData(){
-        return new Data(null, true);
+        return new Data(Integer.MIN_VALUE, true);
     }
 
     public Data(Integer value, boolean stable) {
         this.value = value;
         this.stable = stable;
+    }
+    public Data(Data other){
+        this.value = other.value;;
+        this.stable = other.stable;
     }
 
     public void setStable(boolean stable) {

@@ -10,12 +10,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Client extends AbstractActor {
+    Utils.FileAdd file = new Utils.FileAdd("log.txt");
+
     private final int clientId;
     private int lastRead;
     private final List<ActorRef> replicas;
 
     public static Props props(int clientId) {
-        return Props.create(Client.class, () -> new Client(clientId));
+        return Props.create(refactor.Client.class, () -> new refactor.Client(clientId));
     }
 
     public Client(int clientId) {
@@ -38,6 +40,7 @@ public class Client extends AbstractActor {
     }
 
     private void onTriggerReadOperation(ClientMessages.TriggerReadOperation trigger){
+        file.appendToFile(getSelf().path().name()+" read req to "+trigger.targetReplica);
         if(trigger.targetReplica >= 0 && trigger.targetReplica < this.replicas.size())
             this.replicas.get(trigger.targetReplica).tell(new ClientMessages.ReadReqMsg(), this.getSelf());
     }
@@ -49,6 +52,7 @@ public class Client extends AbstractActor {
     }
 
     private void onReceiveValue(Integer val){
+        file.appendToFile(getSelf().path().name()+" read done "+val);
         System.out.println("\nClient "+getSelf().path().name() + " received value " + val+ " from "+getSender().path().name()+"\n");
         System.out.flush();
     }

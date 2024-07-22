@@ -1,11 +1,11 @@
 package refactor;
 
 public enum TimeoutType {
-    UPDATE(700),
-    WRITEOK(1000),
-    ELECTION_ACK(1000),
+    UPDATE(100),
+    WRITEOK(2000),
+    ELECTION_ACK(100),
     ELECTION_PROTOCOL(5000),
-    RECEIVE_HEARTBEAT(1500),
+    RECEIVE_HEARTBEAT(5000),
     SEND_HEARTBEAT(500);
 
     private final int millis;

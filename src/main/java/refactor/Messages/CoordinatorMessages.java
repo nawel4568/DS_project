@@ -11,15 +11,15 @@ public abstract class CoordinatorMessages implements Serializable {
         public final Timestamp timestamp;
         public final Data data;
         public UpdateMsg(Timestamp timestamp, Data data){
-            this.timestamp = timestamp;
-            this.data = data;
+            this.timestamp = new Timestamp(timestamp);
+            this.data = new Data(data);
         }
     }
 
     public static class WriteOKMsg extends CoordinatorMessages {
         public final Timestamp timestamp;
         public WriteOKMsg(Timestamp timestamp) {
-            this.timestamp = timestamp;
+            this.timestamp = new Timestamp(timestamp);
         }
     }
 }

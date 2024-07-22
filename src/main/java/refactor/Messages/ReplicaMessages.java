@@ -19,7 +19,7 @@ public abstract class ReplicaMessages implements Serializable {
     public static class UpdateAckMsg extends ReplicaMessages {
         public final Timestamp timestamp;
         public UpdateAckMsg(Timestamp timestamp) {
-                        this.timestamp = timestamp;
+                        this.timestamp = new Timestamp(timestamp);
         }
     }
 
@@ -36,15 +36,20 @@ public abstract class ReplicaMessages implements Serializable {
 
             public LocalState(int replicaID, Timestamp lastUpdate, Timestamp lastStable){
                 this.replicaID = replicaID;
-                this.lastUpdate = lastUpdate;
-                this.lastStable = lastStable;
+                this.lastUpdate = new Timestamp(lastUpdate);
+                this.lastStable = new Timestamp(lastStable);
             }
             @Override
             public int compareTo(LocalState other){
                 int compare = this.lastUpdate.compareTo(other.lastUpdate);
                 if(compare != 0)
                     return compare;
-                else return this.lastStable.compareTo(other.lastStable);
+                //otherwise compare by last stable
+                compare = this.lastStable.compareTo(other.lastStable);
+                if(compare != 0)
+                    return compare;
+                //otherwise compare by replica ID
+                return Integer.compare(this.replicaID, other.replicaID);
             }
 
             @Override
@@ -60,7 +65,7 @@ public abstract class ReplicaMessages implements Serializable {
         public final SortedSet<LocalState> localStates;
 
         public ElectionMsg(SortedSet<LocalState> localStates){
-            this.localStates = new TreeSet<LocalState>(localStates);
+            this.localStates = Collections.unmodifiableSortedSet(new TreeSet<LocalState>(localStates));
         }
 
         public static class InconsistentTokenException extends Exception{
@@ -70,31 +75,7 @@ public abstract class ReplicaMessages implements Serializable {
             }
         }
     }
-    /*public static class ElectionMsg extends ReplicaMessages {
 
-        public static final class ActorData{ //class for exchanging data about the replicas
-            public final ActorRef replicaRef;
-            public final Snapshot lastUpdate;
-
-
-            public ActorData(ActorRef replicaRef, Snapshot lastUpdate) {
-                this.replicaRef = replicaRef;
-                this.lastUpdate = lastUpdate;
-            }
-        }
-        public final Map<Integer, ActorData> actorDatas;
-        public final Integer candidateCoordinatorID;
-        public final Snapshot lastKnownUpdate;
-
-        public ElectionMsg(Integer candidateCoordinatorID, Snapshot lastKnownUpdate, Map<Integer, ActorData> actorUpdates) {
-            //this.id = id;
-            this.candidateCoordinatorID = candidateCoordinatorID;
-            this.lastKnownUpdate = lastKnownUpdate;
-            this.actorDatas = Collections.unmodifiableMap(new HashMap<Integer, ActorData>(actorUpdates));
-        }
-
-
-    } */
 
     public static class ElectionAckMsg extends ReplicaMessages {}
 
