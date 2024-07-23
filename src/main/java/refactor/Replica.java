@@ -32,10 +32,10 @@ public class Replica extends AbstractActor {
     static final boolean CRASH_BEFORE_RECEIVING_WRITE_REQ = true;
 
     // Replica Crash before becoming a coordinator and before sending an ACK back
-    static final boolean CRASH_BEFORE_BECOME_COOR_BEFORE_ACK = true;
+    static final boolean CRASH_BEFORE_BECOME_COOR_BEFORE_ACK = false;
 
     // Replica crash after sending an ACK back and before becoming a coordinator
-    static final boolean CRASH_AFTER_SEND_ACK_BEFORE_BECOME_COOR = false;
+    static final boolean CRASH_AFTER_SEND_ACK_BEFORE_BECOME_COOR = true;
 
     /*
     ********************************************************************
@@ -383,6 +383,9 @@ public class Replica extends AbstractActor {
                 for(TimeoutType timeouts : TimeoutType.values())
                     this.clearTimeoutType(timeouts);
 
+                this.mostRecentUpdate = this.lastUpdate;
+                this.candidateID = this.replicaId;
+
                 ReplicaMessages.ElectionMsg token = defaultElectionMessage();
                 this.tokenBuffer.add(token);
                 delay();
@@ -396,7 +399,7 @@ public class Replica extends AbstractActor {
                     this.successor = this.groupOfReplicas.get(
                             (this.groupOfReplicas.indexOf(this.successor) + 1) % this.groupOfReplicas.size()
                     );
-
+                    this.timeoutSchedule.get(TimeoutType.ELECTION_ACK).poll();
                     this.setTimeout(TimeoutType.ELECTION_ACK, -1);
                     //TODO: check if the queue is empty, or add a condition to do this only if your are still in election behavior
                     System.out.println("** "+getSelf().path().name()+" ** is TIMED OUT CUZ OF THE ELECTION_ACK and it is sending msg from buffer to ** "+this.successor.path().name()+" **");
@@ -475,15 +478,21 @@ public class Replica extends AbstractActor {
         //case 0): Manage protocol timeout
         if(msg.instanceCounter < this.electionInstanceCounter){
             //case 0.1) the token is old: discard and return
+            System.out.println(this.getSelf().path().name() + " Case 0.1): receives an old token: it sends the ack and then discards it ");
+            System.out.flush();
             delay();
             this.getSender().tell(new ReplicaMessages.ElectionAckMsg(), this.getSelf());
             return;
         }
         else if(msg.instanceCounter > this.electionInstanceCounter){
-            //case 0.2) the token is from a new election instance, reset your variables and restart your protocol instance (i.e. process the message normally)
-            this.electionInstanceCounter = msg.instanceCounter;
+            //case 0.2) the token is from a new election instance, reset your variables and restart your protocol instance
+            System.out.println(this.getSelf().path().name() + " Case 0.2): receives an token with instance counter bigger than its own: it restarts the protocol");
+            System.out.flush();
             this.candidateID = this.replicaId;
             this.mostRecentUpdate = this.lastUpdate;
+            this.getContext().unbecome();
+            this.onNewElectionMsg(msg);
+            return;
         }
 
 
@@ -503,7 +512,6 @@ public class Replica extends AbstractActor {
             this.successor.tell(token, this.getSelf());
             this.setTimeout(TimeoutType.ELECTION_ACK, -1);
             delay();
-
             this.getSender().tell(new ReplicaMessages.ElectionAckMsg(), this.getSelf());
         }
         //case 2)
@@ -511,6 +519,8 @@ public class Replica extends AbstractActor {
             if(CRASH_BEFORE_BECOME_COOR_BEFORE_ACK){
                 if(a==3){
                     crash();
+                    System.out.println("CRASHEED");
+                    System.out.flush();
                     a++;
                     return;
                 }
@@ -535,12 +545,14 @@ public class Replica extends AbstractActor {
         //case 3)
         else{
             delay();
-            System.out.println("CASE 3: ** "+getSelf().path().name()+" ** DROP the message from ** "+getSender().path().name()+" ** with the last condidate: "+msg.localStates.last().replicaID);
             this.getSender().tell(new ReplicaMessages.ElectionAckMsg(), this.getSelf());
+            System.out.println("CASE 3: ** "+getSelf().path().name()+" ** DROP the message from ** "+getSender().path().name()+" ** with the last condidate: "+msg.localStates.last().replicaID);
+
         }
     }
 
     public void onElectionAckMsg(ReplicaMessages.ElectionAckMsg msg){
+        System.out.println(getSelf().path().name()+" is cancelling the ElectionAck from "+getSender().path().name());
         this.removeTimeout(TimeoutType.ELECTION_ACK);
         this.tokenBuffer.poll();
     }
@@ -553,6 +565,9 @@ public class Replica extends AbstractActor {
         this.clearTimeoutType(TimeoutType.ELECTION_ACK); //cancel all ACK timeout possibly still around due to concurrent elections
         this.tokenBuffer.clear();
         this.electionInstanceCounter = 0;
+        //TODO: uncomment this and see what happens (cuz otherwise with new elections it cmay be wrong)
+        //this.candidateID = this.replicaId;
+        //this.mostRecentUpdate = Timestamp.defaultTimestamp();
     }
 
     public void onHeartbeatMsg(CoordinatorMessages.HeartbeatMsg msg){
@@ -616,7 +631,7 @@ public class Replica extends AbstractActor {
                 delay();
                 if(CRASH_DURING_SEND_UPDATE){
                     a++;
-                    if(a == 23){
+                    if(a == 21){
                         crash();return;
                     }
                 }

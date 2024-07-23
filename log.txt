@@ -1,5 +1,5 @@
-<Replica0> update <1>:<1> <4>
 <Replica1> update <1>:<1> <4>
+<Replica0> update <1>:<1> <4>
 <Replica2> update <1>:<1> <4>
 <Replica3> update <1>:<1> <4>
 <Replica4> update <1>:<1> <4>
