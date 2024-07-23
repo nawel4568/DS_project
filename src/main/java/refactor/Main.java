@@ -17,7 +17,7 @@ import java.util.concurrent.ThreadLocalRandom;
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
-    final static int N_REPLICAS = 6;
+    final static int N_REPLICAS = 10;
     Random rand = new Random();
 
 
@@ -63,7 +63,7 @@ public class Main {
         sleep(1000);
         inputContinue();
         client1.tell(new ClientMessages.TriggerWriteOperation(0,7), ActorRef.noSender());
-        sleep(3000);
+        sleep(5000);
         inputContinue();
 
         client1.tell(new ClientMessages.TriggerWriteOperation(4,9), ActorRef.noSender());

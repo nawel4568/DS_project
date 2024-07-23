@@ -62,9 +62,11 @@ public abstract class ReplicaMessages implements Serializable {
             }
         }
 
+        public final int instanceCounter;
         public final SortedSet<LocalState> localStates;
 
-        public ElectionMsg(SortedSet<LocalState> localStates){
+        public ElectionMsg(int instanceCounter, SortedSet<LocalState> localStates){
+            this.instanceCounter = instanceCounter;
             this.localStates = Collections.unmodifiableSortedSet(new TreeSet<LocalState>(localStates));
         }
 
