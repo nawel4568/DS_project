@@ -17,25 +17,27 @@ public class Replica extends AbstractActor {
     }
 
 
-    Utils.FileAdd file = new Utils.FileAdd("log.txt");
+    Utils.FileAdd file = new Utils.FileAdd("SystemLog.txt");
 
     /*
     ********************************************************************
     CRASH stuff
     ********************************************************************
     */
+
+    private CrashMode crashEvent;
     //private int cnt = 0;
 
     // Static for the Coordinator crashes
-    static int a = 0;
-    static final boolean CRASH_DURING_SEND_UPDATE = false;
-    static final boolean CRASH_BEFORE_RECEIVING_WRITE_REQ = true;
+    //static int a = 0;
+    //static final boolean DURING_UPDATE_BROADCAST = false;
+    //static final boolean BEFORE_WRITEREQ = true;
 
     // Replica Crash before becoming a coordinator and before sending an ACK back
-    static final boolean CRASH_BEFORE_BECOME_COOR_BEFORE_ACK = false;
+    //static final boolean CRASH_BEFORE_BECOME_COOR_BEFORE_ACK = false;
 
     // Replica crash after sending an ACK back and before becoming a coordinator
-    static final boolean CRASH_AFTER_SEND_ACK_BEFORE_BECOME_COOR = true;
+    //static final boolean CRASH_AFTER_SEND_ACK_BEFORE_BECOME_COOR = true;
 
     /*
     ********************************************************************
@@ -98,6 +100,7 @@ public class Replica extends AbstractActor {
         this.mostRecentUpdate = Timestamp.defaultTimestamp();
         this.isCoordinatorElected = false;
         this.electionInstanceCounter = 0;
+        this.crashEvent = new CrashMode(CrashMode.CrashType.NO_CRASH, -1);
 
     }
 
@@ -121,7 +124,7 @@ public class Replica extends AbstractActor {
                 .match(CoordinatorMessages.WriteOKMsg.class, this::onWriteOKMsg)
                 .match(CoordinatorMessages.HeartbeatMsg.class, this::onHeartbeatMsg)
 
-                .match(DebugMessages.PrintHistoryMsg.class, this::onPrintHistoryMsg)
+                //.match(DebugMessages.CrashMsg.class, this::setCrashEvent)
 
                 .matchAny(msg -> {})
 
@@ -141,7 +144,7 @@ public class Replica extends AbstractActor {
 
                 .match(CoordinatorMessages.SyncMsg.class, this::onSyncMsg)
 
-                .match(DebugMessages.PrintHistoryMsg.class, this::onPrintHistoryMsg)
+                .match(DebugMessages.CrashMsg.class, this::setCrashEvent)
 
                 .matchAny(msg -> {})
 
@@ -157,9 +160,17 @@ public class Replica extends AbstractActor {
 
                 .match(ClientMessages.ReadReqMsg.class, this::onReadReqMsg)
                 .match(ClientMessages.WriteReqMsg.class, this::onCoordinatorWriteReqMsg)
+                .match(ReplicaMessages.ElectionMsg.class, msg -> { //can happen, if a replica times out for whatever reason, e.g. because of heavy load
+                    this.getSender().tell(new ReplicaMessages.ElectionAckMsg(), this.getSelf());
+                    for(ActorRef replica : this.groupOfReplicas)
+                        if(!replica.equals(this.getSelf())) {
+                            delay();
+                            replica.tell(new CoordinatorMessages.SyncMsg(), this.getSelf());
+                        }
+                })
 
 
-                .match(DebugMessages.PrintHistoryMsg.class, this::onPrintHistoryMsg)
+                .match(DebugMessages.CrashMsg.class, this::setCrashEvent)
 
                 .matchAny(msg -> {})
 
@@ -243,6 +254,48 @@ public class Replica extends AbstractActor {
         //System.out.println("the size of the queue is: "+ timeoutQueue.size());
     }
 
+    private void setCrashEvent(DebugMessages.CrashMsg msg) {
+        /*if (this.getSelf() == this.coordinator && msg.mode.type == CrashMode.CrashType.INSTANT_CRASH){
+            this.crash();
+            return;
+        }
+
+        if ((msg.mode.type == CrashMode.CrashType.DURING_UPDATE_BROADCAST ||
+                msg.mode.type == CrashMode.CrashType.BEFORE_WRITEREQ || msg.mode.type == CrashMode.CrashType.INSTANT_CRASH) &&
+                (this.getSelf() != this.coordinator)) // if you are not the coordinator and you receive one of these crash modes, just ignore them
+            return;
+
+        else {
+            System.out.println(this.getSelf().path().name() + " Setting crash mode:" + msg.mode.toString());
+
+            this.crashEvent = new CrashMode(msg.mode.type, msg.mode.param);
+        } */
+
+        if(this.getSelf() == this.coordinator) { //crash modes dedicated to the current coordinator
+            switch (msg.mode.type) {
+                case INSTANT_CRASH -> {
+                    this.crash();
+                    return;
+                }
+                case BEFORE_WRITEREQ, DURING_UPDATE_BROADCAST, NO_CRASH -> {
+                    System.out.println(this.getSelf().path().name() + " Setting crash mode:" + msg.mode.toString());
+                    this.crashEvent = new CrashMode(msg.mode.type, msg.mode.param);
+                }
+                default -> {}
+            }
+        }
+        else {
+            switch (msg.mode.type){
+                case CAND_COORD_AFTER_ACK, CAND_COORD_BEFORE_ACK, NO_CRASH -> {  //these are crashes that have to be set to all the replicas because we don't know who the coordinator will be
+                    System.out.println(this.getSelf().path().name() + " Setting crash mode:" + msg.mode.toString());
+                    this.crashEvent = new CrashMode(msg.mode.type, msg.mode.param);
+                }
+                default -> {}
+            }
+
+        }
+    }
+
     private void crash(){
         //cancel all timeouts and crash
         System.out.println("** "+getSelf().path().name()+" ** IS CRASHED ...");
@@ -266,6 +319,7 @@ public class Replica extends AbstractActor {
         System.out.flush();
         this.coordinator = this.getSelf();
         this.getContext().become(coordinatorBehavior());
+        this.isCoordinatorElected = true;
         for(ActorRef replica : this.groupOfReplicas)
             if(!replica.equals(this.getSelf())){
                 delay();
@@ -310,7 +364,11 @@ public class Replica extends AbstractActor {
         else if(localStates.last().lastUpdate.compareTo(localStates.first().lastUpdate) >= 0
                 && localStates.first().lastStable.compareTo(localStates.last().lastStable) == 0){
             Timestamp oldestUnstable = localStates.first().lastUpdate;
-            Timestamp missingUpdate = new Timestamp(oldestUnstable.getEpoch(),oldestUnstable.getSeqNum()+1);
+            //Timestamp missingUpdate = new Timestamp(oldestUnstable.getEpoch(),oldestUnstable.getSeqNum()+1);
+            Timestamp missingUpdate = this.localHistory.containsKey(new Timestamp(oldestUnstable.getEpoch(),oldestUnstable.getSeqNum()+1)) ?
+                    new Timestamp(oldestUnstable.getEpoch(),oldestUnstable.getSeqNum()+1) :
+                    new Timestamp(oldestUnstable.getEpoch()+1,1);
+
             //iterate over the  localHistory and send all the missing updates
             while(missingUpdate.compareTo(this.lastUpdate) <= 0){
                 for(ActorRef replica : this.groupOfReplicas)
@@ -377,7 +435,7 @@ public class Replica extends AbstractActor {
                     this.tokenBuffer.clear();
                     this.electionInstanceCounter = this.electionInstanceCounter + 1;
                 }
-                System.out.println("** "+getSelf().path().name()+"** timeout first cuz of "+msg.type.name()+" and start the Election protocol by sending an ElectionMsg to his successor **  **");
+                System.out.println("** "+getSelf().path().name()+"** timeout first cause of "+msg.type.name()+" and start the Election protocol by sending an ElectionMsg to his successor **  **");
                 System.out.flush();
                 this.getContext().become(replicaDuringElectionBehavior());//first, become in election behavior
                 for(TimeoutType timeouts : TimeoutType.values())
@@ -402,7 +460,7 @@ public class Replica extends AbstractActor {
                     this.timeoutSchedule.get(TimeoutType.ELECTION_ACK).poll();
                     this.setTimeout(TimeoutType.ELECTION_ACK, -1);
                     //TODO: check if the queue is empty, or add a condition to do this only if your are still in election behavior
-                    System.out.println("** "+getSelf().path().name()+" ** is TIMED OUT CUZ OF THE ELECTION_ACK and it is sending msg from buffer to ** "+this.successor.path().name()+" **");
+                    System.out.println("** "+getSelf().path().name()+" ** is TIMED OUT BECAUSE OF THE ELECTION_ACK and it is sending msg from buffer to ** "+this.successor.path().name()+" **");
                     delay();
                     this.successor.tell(this.tokenBuffer.peek(), this.getSelf());
                 }
@@ -516,26 +574,16 @@ public class Replica extends AbstractActor {
         }
         //case 2)
         else if(compare == 0 && this.replicaId == msg.localStates.last().replicaID){
-            if(CRASH_BEFORE_BECOME_COOR_BEFORE_ACK){
-                if(a==3){
-                    crash();
-                    System.out.println("CRASHEED");
-                    System.out.flush();
-                    a++;
-                    return;
-                }
+            if(this.crashEvent.type == CrashMode.CrashType.CAND_COORD_BEFORE_ACK){
+                this.crash();
+                return;
             }
-
             delay();
             this.getSender().tell(new ReplicaMessages.ElectionAckMsg(), this.getSelf());
-            if(CRASH_AFTER_SEND_ACK_BEFORE_BECOME_COOR){
-                if(a==3){
-                    crash();
-                    a++;
-                    return;
-                }
+            if(this.crashEvent.type == CrashMode.CrashType.CAND_COORD_AFTER_ACK){
+                this.crash();
+                return;
             }
-
             System.out.println("CASE 2:  ** "+getSelf().path().name()+" ** become coordinator with the last condidate: "+msg.localStates.last().replicaID);
             System.out.flush();
             this.becomeCoordinator(msg.localStates);
@@ -609,15 +657,21 @@ public class Replica extends AbstractActor {
     */
 
     public void onCoordinatorWriteReqMsg(ClientMessages.WriteReqMsg msg){
-        if (CRASH_BEFORE_RECEIVING_WRITE_REQ){
+        System.out.println(this.getSelf().path().name() + " crash event type:" +this.crashEvent.toString());
+        if(this.crashEvent.type == CrashMode.CrashType.BEFORE_WRITEREQ) {
+            this.crash();
+            return;
+        }
+
+       /* if (BEFORE_WRITEREQ){
             a++;
             if(a == 3){
-                crash();
+                this.crash(new DebugMessages.CrashMsg());
 
                 return;
             }
 
-        }
+        } */
         System.out.println("onCoordinatorWriteReqMsg ...");
         //put the new value in the local history (as unstable) and send the update to the replicas
         this.lastUpdate = this.lastUpdate.incrementSeqNum();
@@ -629,12 +683,19 @@ public class Replica extends AbstractActor {
         for(ActorRef replica : this.groupOfReplicas)
             if(!replica.equals(this.getSelf())){
                 delay();
-                if(CRASH_DURING_SEND_UPDATE){
-                    a++;
-                    if(a == 21){
-                        crash();return;
+                if(this.crashEvent.type == CrashMode.CrashType.DURING_UPDATE_BROADCAST){
+                    if(crashEvent.param == this.groupOfReplicas.indexOf(replica)) {
+                        this.crash();
+                        return;
                     }
                 }
+                /*if(DURING_UPDATE_BROADCAST){
+                    a++;
+                    if(a == 21){
+                        this.crash(new DebugMessages.CrashMsg());
+                        return;
+                    }
+                } */
 
 
                 replica.tell(new CoordinatorMessages.UpdateMsg(this.lastUpdate, newData), this.getSelf());
@@ -673,6 +734,7 @@ public class Replica extends AbstractActor {
             System.out.flush();
             //Quorum reached. Set the update stable and broadcast the WRITEOK
             this.localHistory.get(msg.timestamp).setStable(true);
+            this.lastStable = new Timestamp(msg.timestamp);
             for(ActorRef replica : this.groupOfReplicas)
                 if(!replica.equals(this.getSelf())) {
                     delay();
@@ -685,7 +747,7 @@ public class Replica extends AbstractActor {
     public void onWriteOKMsg(CoordinatorMessages.WriteOKMsg msg){
         System.out.println(this.getSelf().path().name()+" received the WRITEOK from "+this.getSender().path().name() + " for the update: " + msg.timestamp.toString());
         System.out.flush();
-        file.appendToFile("<"+this.getSelf().path().name()+"> update <"+ msg.timestamp.getEpoch() +">:<"+msg.timestamp.getSeqNum()+"> <"+this.localHistory.get(msg.timestamp).value+">");
+        file.appendToFile(this.getSelf().path().name()+" update "+ msg.timestamp.getEpoch() +":"+msg.timestamp.getSeqNum()+" <"+this.localHistory.get(msg.timestamp).value+">");
         this.removeTimeout(TimeoutType.WRITEOK);
         this.localHistory.get(msg.timestamp).setStable(true);
         this.lastStable = new Timestamp(msg.timestamp);
@@ -696,11 +758,6 @@ public class Replica extends AbstractActor {
     Debug messages handlers
     ********************************************************************
     */
-
-    public void onPrintHistoryMsg(DebugMessages.PrintHistoryMsg msg){}
-
-
-
 
 
 }

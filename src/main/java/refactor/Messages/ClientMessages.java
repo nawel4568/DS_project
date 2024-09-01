@@ -1,5 +1,8 @@
 package refactor.Messages;
 
+import akka.actor.ActorPath;
+import akka.actor.ActorRef;
+
 import java.io.Serializable;
 
 public abstract class ClientMessages implements Serializable {
@@ -16,6 +19,15 @@ public abstract class ClientMessages implements Serializable {
         }
     }
 
+    //Message for setting the read schedule to a client
+    public static class ReadScheduleMsg extends ClientMessages{
+        public final int timing;
+        public final int replicaID;
+        public ReadScheduleMsg(int timing, int replicaID){
+            this.timing = timing;
+            this.replicaID = replicaID;
+        }
+    }
     /*
     Triggers to send to the client from the main
     */
