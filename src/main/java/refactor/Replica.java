@@ -26,18 +26,6 @@ public class Replica extends AbstractActor {
     */
 
     private CrashMode crashEvent;
-    //private int cnt = 0;
-
-    // Static for the Coordinator crashes
-    //static int a = 0;
-    //static final boolean DURING_UPDATE_BROADCAST = false;
-    //static final boolean BEFORE_WRITEREQ = true;
-
-    // Replica Crash before becoming a coordinator and before sending an ACK back
-    //static final boolean CRASH_BEFORE_BECOME_COOR_BEFORE_ACK = false;
-
-    // Replica crash after sending an ACK back and before becoming a coordinator
-    //static final boolean CRASH_AFTER_SEND_ACK_BEFORE_BECOME_COOR = true;
 
     /*
     ********************************************************************
@@ -255,21 +243,6 @@ public class Replica extends AbstractActor {
     }
 
     private void setCrashEvent(DebugMessages.CrashMsg msg) {
-        /*if (this.getSelf() == this.coordinator && msg.mode.type == CrashMode.CrashType.INSTANT_CRASH){
-            this.crash();
-            return;
-        }
-
-        if ((msg.mode.type == CrashMode.CrashType.DURING_UPDATE_BROADCAST ||
-                msg.mode.type == CrashMode.CrashType.BEFORE_WRITEREQ || msg.mode.type == CrashMode.CrashType.INSTANT_CRASH) &&
-                (this.getSelf() != this.coordinator)) // if you are not the coordinator and you receive one of these crash modes, just ignore them
-            return;
-
-        else {
-            System.out.println(this.getSelf().path().name() + " Setting crash mode:" + msg.mode.toString());
-
-            this.crashEvent = new CrashMode(msg.mode.type, msg.mode.param);
-        } */
 
         if(this.getSelf() == this.coordinator) { //crash modes dedicated to the current coordinator
             switch (msg.mode.type) {
@@ -662,17 +635,6 @@ public class Replica extends AbstractActor {
             this.crash();
             return;
         }
-
-       /* if (BEFORE_WRITEREQ){
-            a++;
-            if(a == 3){
-                this.crash(new DebugMessages.CrashMsg());
-
-                return;
-            }
-
-        } */
-        System.out.println("onCoordinatorWriteReqMsg ...");
         //put the new value in the local history (as unstable) and send the update to the replicas
         this.lastUpdate = this.lastUpdate.incrementSeqNum();
         System.out.println("Coordinator " + this.getSelf().path().name()+" is receiving WriteRequest from "+this.getSender().path().name() + " with value: " + msg.getValue() + " and is assigning the timestamp: " + this.lastUpdate.toString());
@@ -689,21 +651,12 @@ public class Replica extends AbstractActor {
                         return;
                     }
                 }
-                /*if(DURING_UPDATE_BROADCAST){
-                    a++;
-                    if(a == 21){
-                        this.crash(new DebugMessages.CrashMsg());
-                        return;
-                    }
-                } */
-
-
                 replica.tell(new CoordinatorMessages.UpdateMsg(this.lastUpdate, newData), this.getSelf());
             }
     }
 
     public void onUpdateMsg(CoordinatorMessages.UpdateMsg msg){
-        System.out.println("onUpdateMessages ...");
+        System.out.println(this.getSelf().path().name()+" is receiving an UPDATE message from the coordinator "+this.getSender().path().name() + " with timestamp: " + msg.timestamp);
         System.out.flush();
         //put the incoming unstable update into your local history and send the ACK to the coordinator
         this.removeTimeout(TimeoutType.UPDATE); //safely remove the timeout only if present
@@ -714,7 +667,7 @@ public class Replica extends AbstractActor {
         System.out.println(this.getSelf().path().name()+" is sending UpdateAckMsg to "+this.getSender().path().name() + " for the udpdate: " + this.lastUpdate.toString());
         System.out.flush();
         this.getSender().tell(ack, this.getSelf());
-        System.out.println("** "+getSelf().path().name()+" ** is setting out ThE timeOutType WRITEOK");
+        System.out.println("** "+getSelf().path().name()+" ** is setting out the timeOutType WRITEOK");
         System.out.flush();
         this.setTimeout(TimeoutType.WRITEOK, -1);
     }
@@ -752,12 +705,5 @@ public class Replica extends AbstractActor {
         this.localHistory.get(msg.timestamp).setStable(true);
         this.lastStable = new Timestamp(msg.timestamp);
     }
-
-    /*
-    ********************************************************************
-    Debug messages handlers
-    ********************************************************************
-    */
-
 
 }

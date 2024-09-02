@@ -74,35 +74,51 @@ public class Main {
 
         sleep(1000);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("System started, press Enter to begin the simulation with basic read/write operation testing");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+
         scClient.tell(new ClientMessages.ReadScheduleMsg(1000, 2), ActorRef.noSender());
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to make Client0 send a WRITEREQ with value 4 to Replica3");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+
         clients.get(0).tell(new ClientMessages.TriggerWriteOperation(3, increasingVal++), ActorRef.noSender());
         sleep(100);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to make Client1 send a READREQ to Replica9");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         clients.get(1).tell(new ClientMessages.TriggerReadOperation(9),ActorRef.noSender());
         sleep(100);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to make Client0 send a WRITEREQ with value 8 to Replica2");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         clients.get(0).tell(new ClientMessages.TriggerWriteOperation(2,increasingVal++), ActorRef.noSender());
         sleep(100);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to make Client0 send a READREQ to Replica3");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         clients.get(0).tell(new ClientMessages.TriggerReadOperation(3),ActorRef.noSender());
         sleep(100);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to continue the simulation testing concurrent operations");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Testing multiple concurrent writes from different clients to different replicas");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         int numWrites = 6;
         for(int i=0; i < numWrites; i++)
             clients.get(i).tell(new ClientMessages.TriggerWriteOperation(ThreadLocalRandom.current().nextInt(N_REPLICAS), increasingVal++), ActorRef.noSender());
@@ -113,57 +129,72 @@ public class Main {
         clients.get(ThreadLocalRandom.current().nextInt(N_CLIENTS)).tell(new ClientMessages.TriggerReadOperation(ThreadLocalRandom.current().nextInt(N_REPLICAS)),ActorRef.noSender());
         sleep(500);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to test \"concurrent\" writes from different clients to the same replica");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         for(int i=0; i < numWrites; i++)
             clients.get(i).tell(new ClientMessages.TriggerWriteOperation(5, increasingVal++), ActorRef.noSender());
         sleep(1000);
         System.out.println("Performing a read operation from a client");
         clients.get(ThreadLocalRandom.current().nextInt(N_CLIENTS)).tell(new ClientMessages.TriggerReadOperation(ThreadLocalRandom.current().nextInt(N_REPLICAS)),ActorRef.noSender());
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to test interleaved read and write operations to random replicas");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         for(int i=0; i<10; i++){
             clients.get(ThreadLocalRandom.current().nextInt(N_CLIENTS)).tell(new ClientMessages.TriggerWriteOperation(ThreadLocalRandom.current().nextInt(N_REPLICAS), increasingVal++), ActorRef.noSender());
             clients.get(ThreadLocalRandom.current().nextInt(N_CLIENTS)).tell(new ClientMessages.TriggerReadOperation(ThreadLocalRandom.current().nextInt(N_REPLICAS)),ActorRef.noSender());
         }
         sleep(1000);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to continue the simulation and test the crash events");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.print("Testing the crash event: replica tries to send a WRITEREQ to a coordinator that is crashed");
         System.out.println("Setting the crash mode...");
         for(ActorRef replica : group)
             //i don't know who the coordinator is, so I broadcast the crash mode and the replicas deal with filtering
             replica.tell(new DebugMessages.CrashMsg(new CrashMode(CrashMode.CrashType.BEFORE_WRITEREQ, -1)), ActorRef.noSender());
         sleep(1000);
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press enter to test");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         clients.get(ThreadLocalRandom.current().nextInt(N_CLIENTS)).tell(new ClientMessages.TriggerWriteOperation(ThreadLocalRandom.current().nextInt(N_REPLICAS), increasingVal++), ActorRef.noSender());
         sleep(5000);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to test the crash event: coordinator crashes while broadcasting the UPDATE message");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Setting the crash mode...");
         for(ActorRef replica : group)
             //I don't know who the coordinator is, so I broadcast the crash mode and the replicas deal with filtering
             replica.tell(new DebugMessages.CrashMsg(new CrashMode(CrashMode.CrashType.DURING_UPDATE_BROADCAST, 4)), ActorRef.noSender()); //Replica3 shoyld be become the new coordinator
         sleep(1000);
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press enter to test");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         clients.get(ThreadLocalRandom.current().nextInt(N_CLIENTS)).tell(new ClientMessages.TriggerWriteOperation(ThreadLocalRandom.current().nextInt(N_REPLICAS), increasingVal++), ActorRef.noSender());
         sleep(5000);
 
-
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to test the crash event: candidate coordinator crashes during the election, before sending the ack to the predecessor"); //predeccor times out for ELECTION_ACK
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Setting the crash mode...");
         for(ActorRef replica : group)
             //I don't know who the new coordinator will, so I broadcast the crash mode to set each replica to be in this crash mode
             replica.tell(new DebugMessages.CrashMsg(new CrashMode(CrashMode.CrashType.CAND_COORD_BEFORE_ACK, -1)), ActorRef.noSender()); //Replica3 shoyld be become the new coordinator
         sleep(1000);
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press enter to test");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Crashing the coordinator...");
         for(ActorRef replica : group)
             //I don't know who the coordinator is, so I broadcast the crash mode and the replicas deal with filtering
@@ -171,15 +202,19 @@ public class Main {
         clients.get(ThreadLocalRandom.current().nextInt(N_CLIENTS)).tell(new ClientMessages.TriggerWriteOperation(ThreadLocalRandom.current().nextInt(N_REPLICAS), increasingVal++), ActorRef.noSender());
         sleep(5000);
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press Enter to test the crash event: candidate coordinator crashes during the election, after sending the ack to the predecessor but before becoming coordinator"); //token lost: replicas time out for ELECTION_PROTOCOL
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Setting the crash mode...");
         for(ActorRef replica : group)
             //I don't know who the new coordinator will, so I broadcast the crash mode to set each replica to be in this crash mode
             replica.tell(new DebugMessages.CrashMsg(new CrashMode(CrashMode.CrashType.CAND_COORD_AFTER_ACK, -1)), ActorRef.noSender()); //Replica3 shoyld be become the new coordinator
         sleep(1000);
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Press enter to test");
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Crashing the coordinator...");
         for(ActorRef replica : group)
             //I don't know who the coordinator is, so I broadcast the crash mode and the replicas deal with filtering
@@ -188,12 +223,13 @@ public class Main {
         sleep(5000);
 
 
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("Resetting crash modes...");
         for(ActorRef replica : group)
             replica.tell(new DebugMessages.CrashMsg(new CrashMode(CrashMode.CrashType.NO_CRASH, -1)), ActorRef.noSender()); //Replica3 shoyld be become the new coordinator
         sleep(100);
-
         inputContinue();
+        System.out.println("----------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         sleep(100);
         system.terminate();
 
